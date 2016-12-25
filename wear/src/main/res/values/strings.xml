@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Wristglider</string>
+    <string name="hello_world" translatable="false">xx</string>
+    <string name="permission_fine_location_hint">A flight instrument needs permission to access GPS!</string>
+    <string name="stop_logger">Stop Logger</string>
+    <string name="stop_logger_confirm">Sure you want to stop logger?</string>
+    <string name="logger_started">Flight started</string>
+    <string name="flight_time">Flight time:</string>
+</resources>

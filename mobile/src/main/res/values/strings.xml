@@ -1,0 +1,23 @@
+<resources>
+    <string name="app_name">Wristglider</string>
+    <string name="permission_external_storage_hint">Permission to write external storage is needed to write .igc files.</string>
+    <string name="pilot_name">Pilot</string>
+    <string name="glider_type">Type</string>
+    <string name="glider_id">ID</string>
+    <string name="logger_seconds">Logger frequency</string>
+    <string name="logger_autostart">Logger autostart</string>
+    <string name="rotate_view">Rotate view</string>
+    <string name="enable_ambient">Enable ambient</string>
+    <string name="height_unit">Height unit</string>
+    <string name="speed_unit">Velocity unit</string>
+    <string name="add_new_glider1">Add new</string>
+    <string name="add_new_glider2">glider</string>
+    <string name="glider_type_and_id">Glider type and ID</string>
+    <string name="glider">Glider</string>
+    <string name="select">Select</string>
+    <string name="delete">Delete</string>
+    <string name="ok">Ok</string>
+    <string name="cancel">Cancel</string>
+    <string name="enter_pilot">Enter Pilot</string>
+    <string name="saved_log">Saving log:</string>
+</resources>

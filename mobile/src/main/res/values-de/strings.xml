@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Wristglider</string>
+    <string name="permission_external_storage_hint">Berechtigung zum Speicherzugriff ist nötig um .igc Dateien zu schreiben.</string>
+    <string name="glider_id">ID</string>
+    <string name="glider_type">Typ</string>
+    <string name="height_unit">Einheit Höhe</string>
+    <string name="logger_autostart">Autostart Logger</string>
+    <string name="logger_seconds">Frequenz Logger</string>
+    <string name="pilot_name">Pilot</string>
+    <string name="enable_ambient">Energie sparen</string>
+    <string name="rotate_view">Anzeige drehen</string>
+    <string name="speed_unit">Einheit GS</string>
+    <string name="add_new_glider1">Fluggerät</string>
+    <string name="add_new_glider2">hinzufügen</string>
+    <string name="glider_type_and_id">Fluggerät Typ und ID</string>
+    <string name="glider">Fluggerät</string>
+    <string name="delete">Löschen</string>
+    <string name="select">Auswählen</string>
+    <string name="cancel">Abbrechen</string>
+    <string name="ok">Ok</string>
+    <string name="enter_pilot">Pilot eingeben</string>
+    <string name="saved_log">Speichere Log:</string>
+</resources>

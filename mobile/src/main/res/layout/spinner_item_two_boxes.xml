@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal">
+    <TextView xmlns:android="http://schemas.android.com/apk/res/android"
+        android:id="@+id/spinner_twoline_text_view"
+        android:layout_height="wrap_content"
+        android:layout_width="wrap_content"
+        android:paddingTop="20px"
+        android:paddingBottom="20px"
+        android:paddingStart="15px"
+        android:paddingEnd="15px"
+        android:maxLines="2"
+        android:textAppearance="@android:style/TextAppearance.Material.Medium"
+        />
+</LinearLayout>

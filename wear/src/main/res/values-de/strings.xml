@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Wristglider</string>
+    <string name="flight_time">Flugdauer:</string>
+    <string name="permission_fine_location_hint">Der Flugcomputer benötigt Zugang zu GPS Daten!</string>
+    <string name="stop_logger_confirm">Möchtest Du den Logger stoppen?</string>
+    <string name="stop_logger">Logger Stoppen</string>
+    <string name="logger_started">Flug gestartet</string>
+</resources>

@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "1013125656349",
+    "firebase_url": "https://wristglider.firebaseio.com",
+    "project_id": "wristglider",
+    "storage_bucket": "wristglider.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1013125656349:android:07904894e285b9fb",
+        "android_client_info": {
+          "package_name": "com.pulce.wristglider"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1013125656349-ol3ig39rt7rtskfh2e1elr6pf55ivnsd.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.pulce.wristglider",
+            "certificate_hash": "B709DF7C62FB44E5DE6E2C5160458DB41A3DD148"
+          }
+        },
+        {
+          "client_id": "1013125656349-8ut0jmtt6pl2p9a66sb5hl65769j8k12.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBfshunjNouJJEA9Yik_C5xndGTla_0rt4"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 2,
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1013125656349-8ut0jmtt6pl2p9a66sb5hl65769j8k12.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
