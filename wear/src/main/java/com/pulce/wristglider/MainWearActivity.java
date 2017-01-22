@@ -14,6 +14,7 @@ import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.graphics.drawable.BitmapDrawable;
 import android.location.Location;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -28,10 +29,12 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.ErrorDialogFragment;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.PendingResult;
 import com.google.android.gms.common.api.ResultCallback;
@@ -71,7 +74,6 @@ public class MainWearActivity extends WearableActivity implements
         Thread.UncaughtExceptionHandler {
 
     private static final String TAG = "WearMain";
-    public static final String VERSION = "0.1";
 
     private static final DecimalFormat latForm = new DecimalFormat("0000000");
     private static final DecimalFormat lonForm = new DecimalFormat("00000000");
@@ -80,12 +82,15 @@ public class MainWearActivity extends WearableActivity implements
     private static SharedPreferences prefs;
     private static boolean debugMode = true;
 
+    private static boolean mockup = false;
+
     private TextView speedTextView;
     private TextView altTextView;
     private TextView alternatives;
     private ImageView directionView;
     private TextView loggerState;
     private ProgressBar progressBar;
+    private RelativeLayout coreLayout;
 
     private Bitmap arrowBitmap;
     private Matrix rotateMatrix = new Matrix();
@@ -110,23 +115,36 @@ public class MainWearActivity extends WearableActivity implements
 
     private boolean activityStopping;
 
+    private EarthGravitationalModel gh;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if (BuildConfig.DEBUG) {
-            debugMode = true;
-        }
-        if (debugMode) Log.d(TAG, "creating");
+        debugMode = BuildConfig.LOG_ENABLED;
+        if (debugMode) Log.d(TAG, "creating " + BuildConfig.VERSION_NAME);
         setAmbientEnabled();
         prefs = PreferenceManager.getDefaultSharedPreferences(this);
         mDefaultUncaughtExceptionHandler = Thread.getDefaultUncaughtExceptionHandler();
         Thread.setDefaultUncaughtExceptionHandler(this);
 
-        if (debugMode) Log.d(TAG, "Screen flag " + prefs.getBoolean(Statics.PREFSCREENON, true));
-        if (!prefs.getBoolean(Statics.PREFSCREENON, true)) {
+        gh = new EarthGravitationalModel();
+        AsyncTask.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    gh.load(MainWearActivity.this);
+                } catch (Exception e) {
+                    if (debugMode) Log.e(TAG, Log.getStackTraceString(e));
+                    reportException(e);
+                }
+            }
+        });
+
+        if (debugMode) Log.d(TAG, "Screen flag " + prefs.getBoolean(Statics.PREFSCREENON, false));
+        if (!prefs.getBoolean(Statics.PREFSCREENON, false)) {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
-        if (prefs.getBoolean(Statics.PREFROTATEVIEW, true)) {
+        if (prefs.getBoolean(Statics.PREFROTATEVIEW, false)) {
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         }
         if (DateFormat.is24HourFormat(this)) {
@@ -156,24 +174,12 @@ public class MainWearActivity extends WearableActivity implements
         alternatives = (TextView) findViewById(R.id.otherfeed);
         loggerState = (TextView) findViewById(R.id.loggerstate);
         progressBar = (ProgressBar) findViewById(R.id.progress);
-        alternatives.setOnLongClickListener(new View.OnLongClickListener() {
-            @Override
-            public boolean onLongClick(View v) {
-                File dir = getFilesDir();
-                File[] subFiles = dir.listFiles();
-                if (subFiles != null) {
-                    for (File file : subFiles) {
-                        if (debugMode) Log.d(TAG, "Available Logfile: " + file.getName());
-                    }
-                }
-                return true;
-            }
-        });
-        speedTextView.setOnLongClickListener(new View.OnLongClickListener() {
+        coreLayout = (RelativeLayout) findViewById(R.id.container);
+        coreLayout.setOnLongClickListener(new View.OnLongClickListener() {
             @Override
             public boolean onLongClick(View v) {
                 if (loggerRunning) {
-                    new AlertDialog.Builder(MainWearActivity.this)
+                    final AlertDialog.Builder dialog = new AlertDialog.Builder(MainWearActivity.this)
                             .setTitle(R.string.stop_logger)
                             .setMessage(R.string.stop_logger_confirm)
                             .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
@@ -185,15 +191,53 @@ public class MainWearActivity extends WearableActivity implements
                                 public void onClick(DialogInterface dialog, int which) {
                                 }
                             })
-                            .setIcon(android.R.drawable.ic_dialog_alert)
-                            .show();
+                            .setIcon(android.R.drawable.ic_dialog_alert);
+                    final AlertDialog alert = dialog.create();
+                    alert.show();
+                    final Handler handler = new Handler();
+                    final Runnable runnable = new Runnable() {
+                        @Override
+                        public void run() {
+                            if (alert.isShowing()) {
+                                alert.dismiss();
+                            }
+                        }
+                    };
+                    alert.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                        @Override
+                        public void onDismiss(DialogInterface dialog) {
+                            handler.removeCallbacks(runnable);
+                        }
+                    });
+                    handler.postDelayed(runnable, 3000);
                 } else {
                     startLogger();
                 }
                 return true;
             }
         });
+
+        if (mockup) {
+            progressBar.setVisibility(View.INVISIBLE);
+            speedTextView.setText("36.5");
+            altTextView.setText("3585");
+            directionView.setImageDrawable(getRotatedDir(30));
+        }
+/*        alternatives.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                File dir = getFilesDir();
+                File[] subFiles = dir.listFiles();
+                if (subFiles != null) {
+                    for (File file : subFiles) {
+                        if (debugMode) Log.d(TAG, "Available Logfile: " + file.getName());
+                    }
+                }
+                return true;
+            }
+        });*/
     }
+
 
     @Override
     public void onStart() {
@@ -236,7 +280,6 @@ public class MainWearActivity extends WearableActivity implements
     protected void onPause() {
         super.onPause();
         if (debugMode) Log.d(TAG, "pausing");
-        //TODO: Delete this
     }
 
     @Override
@@ -320,7 +363,7 @@ public class MainWearActivity extends WearableActivity implements
         prefs.edit().putString(Statics.PREFGLIDERID, dataMapItem.getDataMap().getString(Statics.PREFGLIDERID)).apply();
         prefs.edit().putLong(Statics.PREFLOGGERSECONDS, dataMapItem.getDataMap().getLong(Statics.PREFLOGGERSECONDS)).apply();
         prefs.edit().putBoolean(Statics.PREFLOGGERAUTO, dataMapItem.getDataMap().getBoolean(Statics.PREFLOGGERAUTO)).apply();
-        if (prefs.getBoolean(Statics.PREFROTATEVIEW, true) != dataMapItem.getDataMap().getBoolean(Statics.PREFROTATEVIEW)) {
+        if (prefs.getBoolean(Statics.PREFROTATEVIEW, false) != dataMapItem.getDataMap().getBoolean(Statics.PREFROTATEVIEW)) {
             if (dataMapItem.getDataMap().getBoolean(Statics.PREFROTATEVIEW)) {
                 setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
             } else {
@@ -328,7 +371,7 @@ public class MainWearActivity extends WearableActivity implements
             }
         }
         prefs.edit().putBoolean(Statics.PREFROTATEVIEW, dataMapItem.getDataMap().getBoolean(Statics.PREFROTATEVIEW)).apply();
-        if (prefs.getBoolean(Statics.PREFSCREENON, true) != dataMapItem.getDataMap().getBoolean(Statics.PREFSCREENON)) {
+        if (prefs.getBoolean(Statics.PREFSCREENON, false) != dataMapItem.getDataMap().getBoolean(Statics.PREFSCREENON)) {
             Intent i = getBaseContext().getPackageManager()
                     .getLaunchIntentForPackage(getBaseContext().getPackageName());
             i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
@@ -353,12 +396,13 @@ public class MainWearActivity extends WearableActivity implements
         } else
             speedTextView.setText("--");
         if (location.hasAltitude()) {
+            //Log.d(TAG, "Offsett: " + gh.heightOffset(location.getLongitude(), location.getLatitude(), location.getAltitude()));
             // Bearing
             progressBar.setVisibility(View.INVISIBLE);
             if (location.hasBearing()) {
                 directionView.setImageDrawable(getRotatedDir(location.getBearing()));
             }
-            altTextView.setText(String.format("%.0f", location.getAltitude() * heightmultiplier));
+            altTextView.setText(String.format("%.0f", (location.getAltitude() - gh.heightOffset(location.getLongitude(), location.getLatitude(), location.getAltitude())) * heightmultiplier));
         } else {
             altTextView.setText("--");
         }
@@ -377,7 +421,7 @@ public class MainWearActivity extends WearableActivity implements
             if (location.hasAltitude()) logIGCline(location);
         } else if (pointStack.size() > 9 &&
                 location.distanceTo(pointStack.getFirst()) > (location.getTime() - pointStack.getFirst().getTime()) * 0.004) {
-            if (prefs.getBoolean(Statics.PREFLOGGERAUTO, true)) {
+            if (prefs.getBoolean(Statics.PREFLOGGERAUTO, false)) {
                 startLogger();
                 for (Location loc : pointStack) logIGCline(loc);
             }
@@ -394,12 +438,10 @@ public class MainWearActivity extends WearableActivity implements
             if (ActivityCompat.shouldShowRequestPermissionRationale(MainWearActivity.this,
                     Manifest.permission.ACCESS_FINE_LOCATION)) {
                 Toast.makeText(this, R.string.permission_fine_location_hint, Toast.LENGTH_LONG).show();
-            } else {
-                ActivityCompat.requestPermissions(this,
-                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                        Statics.MY_PERMISSION_FINE_LOCATION);
             }
-
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                    Statics.MY_PERMISSION_FINE_LOCATION);
         } else {
             LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, locationRequest, this);
         }
@@ -461,9 +503,6 @@ public class MainWearActivity extends WearableActivity implements
 
     private void startLogger() {
         if (debugMode) Log.d(TAG, "logger triggered");
-        if (pointStack.size() < 1) {
-            return;
-        }
         int num = 1;
         boolean unique;
         do {
@@ -488,12 +527,16 @@ public class MainWearActivity extends WearableActivity implements
             pw.println("HFPLTPILOTINCHARGE:" + prefs.getString(Statics.PREFPILOTNAME, "Anno Nymos"));
             pw.println("HFGTYGLIDERTYPE:" + prefs.getString(Statics.PREFGLIDERTYPE, "Dummy Glider"));
             pw.println("HFGIDGLIDERID:" + prefs.getString(Statics.PREFGLIDERID, "12345"));
-            pw.println("HFFTYFRTYPE:WristGlider_V_" + VERSION);
+            pw.println("HFFTYFRTYPE:WristGlider_V_" + BuildConfig.VERSION_NAME);
             pw.println("HFGPS:Generic");
             pw.println("HFDTM100DATUM:WGS-1984");
             pw.println("I013638FXA");
             loggerRunning = true;
-            startTimeOfFlight = pointStack.getFirst().getTime();
+            if (pointStack.size() > 0) {
+                startTimeOfFlight = pointStack.getFirst().getTime();
+            } else {
+                startTimeOfFlight = new Date().getTime();
+            }
             loggerState.setText(getString(R.string.logger_started));
         } catch (FileNotFoundException e) {
             reportException(e);
@@ -544,7 +587,7 @@ public class MainWearActivity extends WearableActivity implements
             pw.println("B" + Statics.getUTCtimeAsString(location.getTime()) +
                     Statics.decToIgcFormat(location.getLatitude(), latForm) + "N" +
                     Statics.decToIgcFormat(location.getLongitude(), lonForm) + "E" +
-                    "A00000" + new DecimalFormat("00000").format(location.getAltitude()) +
+                    "A00000" + new DecimalFormat("00000").format(location.getAltitude() - gh.heightOffset(location.getLongitude(), location.getLatitude(), location.getAltitude())) +
                     new DecimalFormat("000").format(location.getAccuracy()));
         } catch (FileNotFoundException e) {
             reportException(e);
@@ -567,6 +610,7 @@ public class MainWearActivity extends WearableActivity implements
                 requestLocationUpdates();
             } else {
                 Toast.makeText(this, R.string.permission_fine_location_hint, Toast.LENGTH_LONG).show();
+                finish();
             }
         }
     }
@@ -628,5 +672,4 @@ public class MainWearActivity extends WearableActivity implements
         reportException(throwable);
         mDefaultUncaughtExceptionHandler.uncaughtException(thread, throwable);
     }
-
 }

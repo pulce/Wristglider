@@ -81,9 +81,7 @@ public class MainActivity extends Activity implements
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if (BuildConfig.DEBUG) {
-            debugMode = true;
-        }
+        debugMode = BuildConfig.LOG_ENABLED;
 
         Log.d(TAG, "Created");
         setContentView(R.layout.activity_main);
@@ -103,19 +101,23 @@ public class MainActivity extends Activity implements
         mGoogleApiClient = new GoogleApiClient.Builder(this)
                 .addConnectionCallbacks(this)
                 .addApi(Wearable.API).build();
-        //throw new RuntimeException("This is a craaaaash");
+        mGoogleApiClient.connect();
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        mGoogleApiClient.connect();
     }
 
 
     @Override
     public void onPause() {
         super.onPause();
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
         Wearable.DataApi.removeListener(mGoogleApiClient, this);
         mGoogleApiClient.disconnect();
     }
@@ -140,23 +142,7 @@ public class MainActivity extends Activity implements
     public void onConnected(@Nullable Bundle bundle) {
         if (debugMode) Log.d(TAG, "onConnected");
         Wearable.DataApi.addListener(mGoogleApiClient, this);
-        PendingResult<DataItemBuffer> results = Wearable.DataApi.getDataItems(mGoogleApiClient);
-        results.setResultCallback(new ResultCallback<DataItemBuffer>() {
-            @Override
-            public void onResult(@NonNull DataItemBuffer dataItems) {
-                if (dataItems.getCount() != 0) {
-                    for (DataItem item : dataItems) {
-                        if (item.getUri().getPath().contains(Statics.DATAIGC)) {
-                            getStringFromAsset(item);
-                        }
-                        if (item.getUri().getPath().contains(Statics.DATATHROWABLE)) {
-                            getExceptionFromWear(item);
-                        }
-                    }
-                }
-                dataItems.release();
-            }
-        });
+        getAllAvailableDataItems();
     }
 
     @Override
@@ -191,16 +177,31 @@ public class MainActivity extends Activity implements
         }
     }
 
+    private void getAllAvailableDataItems() {
+        PendingResult<DataItemBuffer> results = Wearable.DataApi.getDataItems(mGoogleApiClient);
+        results.setResultCallback(new ResultCallback<DataItemBuffer>() {
+            @Override
+            public void onResult(@NonNull DataItemBuffer dataItems) {
+                if (dataItems.getCount() != 0) {
+                    for (DataItem item : dataItems) {
+                        if (item.getUri().getPath().contains(Statics.DATAIGC)) {
+                            getStringFromAsset(item);
+                        }
+                        if (item.getUri().getPath().contains(Statics.DATATHROWABLE)) {
+                            getExceptionFromWear(item);
+                        }
+                    }
+                }
+                dataItems.release();
+            }
+        });
+    }
+
     private void getStringFromAsset(DataItem dataItem) {
         if (ContextCompat.checkSelfPermission(MainActivity.this, android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            if (ActivityCompat.shouldShowRequestPermissionRationale(MainActivity.this,
-                    android.Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
-                Toast.makeText(MainActivity.this, getString(R.string.permission_external_storage_hint), Toast.LENGTH_LONG).show();
-            } else {
-                ActivityCompat.requestPermissions(MainActivity.this,
-                        new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
-                        Statics.MY_PERMISSION_WRITE_STORAGE);
-            }
+            ActivityCompat.requestPermissions(MainActivity.this,
+                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                    Statics.MY_PERMISSION_WRITE_STORAGE);
             return;
         }
 
@@ -294,9 +295,9 @@ public class MainActivity extends Activity implements
         dataMap.getDataMap().putString(Statics.PREFGLIDERTYPE, prefs.getString(Statics.PREFGLIDERTYPE, "na"));
         dataMap.getDataMap().putString(Statics.PREFGLIDERID, prefs.getString(Statics.PREFGLIDERID, "na"));
         dataMap.getDataMap().putLong(Statics.PREFLOGGERSECONDS, prefs.getLong(Statics.PREFLOGGERSECONDS, 1000));
-        dataMap.getDataMap().putBoolean(Statics.PREFLOGGERAUTO, prefs.getBoolean(Statics.PREFLOGGERAUTO, true));
-        dataMap.getDataMap().putBoolean(Statics.PREFROTATEVIEW, prefs.getBoolean(Statics.PREFROTATEVIEW, true));
-        dataMap.getDataMap().putBoolean(Statics.PREFSCREENON, prefs.getBoolean(Statics.PREFSCREENON, true));
+        dataMap.getDataMap().putBoolean(Statics.PREFLOGGERAUTO, prefs.getBoolean(Statics.PREFLOGGERAUTO, false));
+        dataMap.getDataMap().putBoolean(Statics.PREFROTATEVIEW, prefs.getBoolean(Statics.PREFROTATEVIEW, false));
+        dataMap.getDataMap().putBoolean(Statics.PREFSCREENON, prefs.getBoolean(Statics.PREFSCREENON, false));
         dataMap.getDataMap().putString(Statics.PREFSPEEDUNIT, prefs.getString(Statics.PREFSPEEDUNIT, "km/h"));
         dataMap.getDataMap().putString(Statics.PREFHEIGTHUNIT, prefs.getString(Statics.PREFHEIGTHUNIT, "m"));
         PutDataRequest request = dataMap.asPutDataRequest();
@@ -450,7 +451,7 @@ public class MainActivity extends Activity implements
             case Statics.PREFROTATEVIEW:
             case Statics.PREFSCREENON:
                 final CheckBox cp2 = new CheckBox(this);
-                cp2.setChecked(prefs.getBoolean(preferencekey, true));
+                cp2.setChecked(prefs.getBoolean(preferencekey, false));
                 cp2.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
                     @Override
                     public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
@@ -552,10 +553,13 @@ public class MainActivity extends Activity implements
                                            @NonNull String permissions[], @NonNull int[] grantResults) {
         switch (requestCode) {
             case Statics.MY_PERMISSION_WRITE_STORAGE: {
-                if (grantResults.length < 1 ||
-                        grantResults[0] != PackageManager.PERMISSION_GRANTED) {
-                    Toast.makeText(this, R.string.permission_external_storage_hint, Toast.LENGTH_LONG).show();
-                }
+                if (grantResults.length > 0) {
+                    if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                        getAllAvailableDataItems();
+                    } else if (grantResults[0] == PackageManager.PERMISSION_DENIED) {
+                        Toast.makeText(MainActivity.this, getString(R.string.permission_external_storage_hint), Toast.LENGTH_LONG).show();
+                    }
+                 }
             }
         }
     }

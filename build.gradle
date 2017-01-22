@@ -16,6 +16,15 @@ allprojects {
     repositories {
         jcenter()
     }
+    project.ext {
+        myApplicationID="com.pulce.wristglider"
+        myVersionCode=3
+        myVersionNumber="0.0.3"
+        myMinSdkVersion=20
+        myTargetSdkVersion=24
+        myCompileSdkVersion=24
+        myBuildToolsVersion="23.0.2"
+    }
 }
 
 task clean(type: Delete) {

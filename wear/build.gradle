@@ -1,19 +1,23 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 24
-    buildToolsVersion "23.0.2"
+    compileSdkVersion project.myCompileSdkVersion.toInteger()
+    buildToolsVersion project.ext.myBuildToolsVersion
     defaultConfig {
-        applicationId "com.pulce.wristglider"
-        minSdkVersion 20
-        targetSdkVersion 24
-        versionCode 1
-        versionName "1.0"
+        applicationId project.ext.myApplicationID
+        minSdkVersion project.ext.myMinSdkVersion
+        targetSdkVersion project.ext.myTargetSdkVersion
+        versionCode project.ext.myVersionCode
+        versionName project.ext.myVersionNumber
     }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            buildConfigField "boolean", "LOG_ENABLED", "false"
+        }
+        debug {
+            buildConfigField "boolean", "LOG_ENABLED", "true"
         }
     }
 }
