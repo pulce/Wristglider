@@ -2,9 +2,11 @@ package com.pulce.wristglider;
 
 import android.Manifest;
 import android.app.AlertDialog;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
@@ -15,6 +17,7 @@ import android.graphics.Matrix;
 import android.graphics.drawable.BitmapDrawable;
 import android.location.Location;
 import android.os.AsyncTask;
+import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -82,13 +85,14 @@ public class MainWearActivity extends WearableActivity implements
     private static SharedPreferences prefs;
     private static boolean debugMode = true;
 
-    private static boolean mockup = false;
+    private static boolean mockup = true;
 
     private TextView speedTextView;
     private TextView altTextView;
     private TextView alternatives;
     private ImageView directionView;
     private TextView loggerState;
+    //private TextView batteryState;
     private ProgressBar progressBar;
     private RelativeLayout coreLayout;
 
@@ -117,6 +121,9 @@ public class MainWearActivity extends WearableActivity implements
 
     private EarthGravitationalModel gh;
 
+    private BroadcastReceiver mBatInfoReceiver;
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -139,10 +146,12 @@ public class MainWearActivity extends WearableActivity implements
                 }
             }
         });
-
         if (debugMode) Log.d(TAG, "Screen flag " + prefs.getBoolean(Statics.PREFSCREENON, false));
         if (!prefs.getBoolean(Statics.PREFSCREENON, false)) {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
+        } else {
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
         if (prefs.getBoolean(Statics.PREFROTATEVIEW, false)) {
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
@@ -173,6 +182,15 @@ public class MainWearActivity extends WearableActivity implements
         directionView = (ImageView) findViewById(R.id.directionImage);
         alternatives = (TextView) findViewById(R.id.otherfeed);
         loggerState = (TextView) findViewById(R.id.loggerstate);
+        /*batteryState = (TextView) findViewById(R.id.batterystate);
+        mBatInfoReceiver = new BroadcastReceiver(){
+            @Override
+            public void onReceive(Context ctxt, Intent intent) {
+                int level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, 0);
+                batteryState.setText("Bat: " + String.valueOf(level) + "%");
+            }
+        };*/
+        this.registerReceiver(this.mBatInfoReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
         progressBar = (ProgressBar) findViewById(R.id.progress);
         coreLayout = (RelativeLayout) findViewById(R.id.container);
         coreLayout.setOnLongClickListener(new View.OnLongClickListener() {
@@ -252,7 +270,7 @@ public class MainWearActivity extends WearableActivity implements
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        if (alternatives != null)
+                    if (alternatives != null)
                             alternatives.setText(clockFormat.format(new Date()).replaceAll(":", "\n"));
                     }
                 });
@@ -375,6 +393,7 @@ public class MainWearActivity extends WearableActivity implements
             Intent i = getBaseContext().getPackageManager()
                     .getLaunchIntentForPackage(getBaseContext().getPackageName());
             i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            finish();
             startActivity(i);
         }
         prefs.edit().putBoolean(Statics.PREFSCREENON, dataMapItem.getDataMap().getBoolean(Statics.PREFSCREENON)).apply();

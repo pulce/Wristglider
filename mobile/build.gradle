@@ -22,6 +22,7 @@ android {
             buildConfigField "boolean", "LOG_ENABLED", "true"
         }
     }
+    buildToolsVersion '25.0.2'
 }
 
 dependencies {

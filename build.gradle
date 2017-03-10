@@ -5,7 +5,7 @@ buildscript {
         jcenter()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:2.2.3'
+        classpath 'com.android.tools.build:gradle:2.3.0'
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files
         classpath 'com.google.gms:google-services:3.0.0'
@@ -18,12 +18,12 @@ allprojects {
     }
     project.ext {
         myApplicationID="com.pulce.wristglider"
-        myVersionCode=3
-        myVersionNumber="0.0.3"
+        myVersionCode=4
+        myVersionNumber="0.1.0"
         myMinSdkVersion=20
-        myTargetSdkVersion=24
-        myCompileSdkVersion=24
-        myBuildToolsVersion="23.0.2"
+        myTargetSdkVersion=25
+        myCompileSdkVersion=25
+        myBuildToolsVersion="25.0.2"
     }
 }
 

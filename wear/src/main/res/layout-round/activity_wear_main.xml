@@ -8,7 +8,6 @@
     android:clickable="true"
     tools:context="com.pulce.wristglider.MainWearActivity"
     tools:deviceIds="wear"
-    android:keepScreenOn="true"
     >
 
     <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
