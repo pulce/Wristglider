@@ -83,9 +83,9 @@ public class MainWearActivity extends WearableActivity implements
     private static SimpleDateFormat clockFormat;
 
     private static SharedPreferences prefs;
-    private static boolean debugMode = true;
+    private static boolean debugMode = false;
 
-    private static boolean mockup = true;
+    private static boolean mockup = false;
 
     private TextView speedTextView;
     private TextView altTextView;
