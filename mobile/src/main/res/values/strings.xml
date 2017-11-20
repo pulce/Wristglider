@@ -20,4 +20,5 @@
     <string name="cancel">Cancel</string>
     <string name="enter_pilot">Enter Pilot</string>
     <string name="saved_log">Saving log:</string>
+    <string name="use_bt_vario">Use bluetooth vario</string>
 </resources>

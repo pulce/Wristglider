@@ -31,6 +31,8 @@ public class Statics {
     public static final String PREFSCREENON = "/com/pulce/wristglider/prefscreenon";
     public static final String PREFHEIGTHUNIT = "/com/pulce/wristglider/prefheightunit";
     public static final String PREFSPEEDUNIT = "/com/pulce/wristglider/prefspeedunit";
+    public static final String PREFUSEBTVARIO = "/com/pulce/wristglider/prefusebtvario";
+    public static final String PREFBTVARIODEVICE = "/com/pulce/wristglider/prefbtvariodevice";
 
 
     public static String getUTCdateReverse() {

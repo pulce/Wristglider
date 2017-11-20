@@ -399,6 +399,7 @@ public class MainWearActivity extends WearableActivity implements
             }
         }
         prefs.edit().putString(Statics.PREFROTATEDEGREES, dataMapItem.getDataMap().getString(Statics.PREFROTATEDEGREES, "0")).apply();
+        prefs.edit().putBoolean(Statics.PREFUSEBTVARIO, dataMapItem.getDataMap().getBoolean(Statics.PREFUSEBTVARIO)).apply();
         setMultipliers();
         if (debugMode) Log.d(TAG, "Preferences updated");
     }

@@ -97,6 +97,7 @@ public class MainActivity extends Activity implements
         addTableRow(getString(R.string.rotate_view), Statics.PREFROTATEDEGREES);
         addTableRow(getString(R.string.height_unit), Statics.PREFHEIGTHUNIT);
         addTableRow(getString(R.string.speed_unit), Statics.PREFSPEEDUNIT);
+        addTableRow(getString(R.string.use_bt_vario), Statics.PREFUSEBTVARIO);
 
         mGoogleApiClient = new GoogleApiClient.Builder(this)
                 .addConnectionCallbacks(this)
@@ -301,6 +302,7 @@ public class MainActivity extends Activity implements
         dataMap.getDataMap().putString(Statics.PREFSPEEDUNIT, prefs.getString(Statics.PREFSPEEDUNIT, "km/h"));
         dataMap.getDataMap().putString(Statics.PREFHEIGTHUNIT, prefs.getString(Statics.PREFHEIGTHUNIT, "m"));
         dataMap.getDataMap().putString(Statics.PREFROTATEDEGREES, prefs.getString(Statics.PREFROTATEDEGREES, "0"));
+        dataMap.getDataMap().putBoolean(Statics.PREFUSEBTVARIO, prefs.getBoolean(Statics.PREFUSEBTVARIO, false));
         PutDataRequest request = dataMap.asPutDataRequest();
         request.setUrgent();
         Wearable.DataApi.putDataItem(mGoogleApiClient, request);
@@ -450,6 +452,7 @@ public class MainActivity extends Activity implements
                 break;
             case Statics.PREFLOGGERAUTO:
             case Statics.PREFSCREENON:
+            case Statics.PREFUSEBTVARIO:
                 final CheckBox cp2 = new CheckBox(this);
                 cp2.setChecked(prefs.getBoolean(preferencekey, false));
                 cp2.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
