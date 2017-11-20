@@ -93,8 +93,8 @@ public class MainActivity extends Activity implements
         addTableRow(getString(R.string.glider), Statics.PREFGLIDERARRAY);
         addTableRow(getString(R.string.logger_seconds), Statics.PREFLOGGERSECONDS);
         addTableRow(getString(R.string.logger_autostart), Statics.PREFLOGGERAUTO);
-        addTableRow(getString(R.string.rotate_view), Statics.PREFROTATEVIEW);
         addTableRow(getString(R.string.enable_ambient), Statics.PREFSCREENON);
+        addTableRow(getString(R.string.rotate_view), Statics.PREFROTATEDEGREES);
         addTableRow(getString(R.string.height_unit), Statics.PREFHEIGTHUNIT);
         addTableRow(getString(R.string.speed_unit), Statics.PREFSPEEDUNIT);
 
@@ -300,6 +300,7 @@ public class MainActivity extends Activity implements
         dataMap.getDataMap().putBoolean(Statics.PREFSCREENON, prefs.getBoolean(Statics.PREFSCREENON, false));
         dataMap.getDataMap().putString(Statics.PREFSPEEDUNIT, prefs.getString(Statics.PREFSPEEDUNIT, "km/h"));
         dataMap.getDataMap().putString(Statics.PREFHEIGTHUNIT, prefs.getString(Statics.PREFHEIGTHUNIT, "m"));
+        dataMap.getDataMap().putString(Statics.PREFROTATEDEGREES, prefs.getString(Statics.PREFROTATEDEGREES, "0"));
         PutDataRequest request = dataMap.asPutDataRequest();
         request.setUrgent();
         Wearable.DataApi.putDataItem(mGoogleApiClient, request);
@@ -448,7 +449,6 @@ public class MainActivity extends Activity implements
                 });
                 break;
             case Statics.PREFLOGGERAUTO:
-            case Statics.PREFROTATEVIEW:
             case Statics.PREFSCREENON:
                 final CheckBox cp2 = new CheckBox(this);
                 cp2.setChecked(prefs.getBoolean(preferencekey, false));
@@ -464,9 +464,15 @@ public class MainActivity extends Activity implements
             case Statics.PREFHEIGTHUNIT:
             case Statics.PREFSPEEDUNIT:
             case Statics.PREFLOGGERSECONDS:
+            case Statics.PREFROTATEDEGREES:
                 final Spinner spinner2 = new Spinner(this);
                 ArrayList<String> spinner2Array = new ArrayList<>();
                 switch (preferencekey) {
+                    case Statics.PREFROTATEDEGREES:
+                        spinner2Array.add("0");
+                        spinner2Array.add("90");
+                        spinner2Array.add("-90");
+                        break;
                     case Statics.PREFHEIGTHUNIT:
                         spinner2Array.add("m");
                         spinner2Array.add("ft");
@@ -485,6 +491,17 @@ public class MainActivity extends Activity implements
                 }
                 ArrayAdapter<String> spinner2ArrayAdapter = new ArrayAdapter<>(this, R.layout.spinner_item, R.id.standard_text_view, spinner2Array);
                 spinner2.setAdapter(spinner2ArrayAdapter);
+                for (int i = 0; i < spinner2Array.size(); i++) {
+                    if (preferencekey.equals(Statics.PREFLOGGERSECONDS)) {
+                        if (("" + (prefs.getLong(preferencekey, 0)/1000)).equals(spinner2Array.get(i))) {
+                            spinner2.setSelection(i);
+                        }
+                    } else {
+                        if (prefs.getString(preferencekey, "").equals(spinner2Array.get(i))) {
+                            spinner2.setSelection(i);
+                        }
+                    }
+                }
                 spinner2.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                     @Override
                     public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {

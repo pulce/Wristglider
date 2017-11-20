@@ -12,6 +12,9 @@ public class Statics {
     public static final int MY_PERMISSION_WRITE_STORAGE = 42;
     public static final int MY_PERMISSION_FINE_LOCATION = 43;
 
+    private static final DecimalFormat latForm = new DecimalFormat("0000000");
+    private static final DecimalFormat lonForm = new DecimalFormat("00000000");
+
     public static final String DATAPREFERENCES = "/com/pulce/wristglider/datapreferences";
     public static final String DATAIGC = "/com/pulce/wristglider/dataigc";
     public static final String DATADELETE = "/com/pulce/wristglider/datadelete";
@@ -24,6 +27,7 @@ public class Statics {
     public static final String PREFLOGGERAUTO = "/com/pulce/wristglider/prefloggerauto";
     public static final String PREFLOGGERSECONDS = "/com/pulce/wristglider/prefloggerseconds";
     public static final String PREFROTATEVIEW = "/com/pulce/wristglider/prefrotateview";
+    public static final String PREFROTATEDEGREES = "/com/pulce/wristglider/prefrotatedegrees";
     public static final String PREFSCREENON = "/com/pulce/wristglider/prefscreenon";
     public static final String PREFHEIGTHUNIT = "/com/pulce/wristglider/prefheightunit";
     public static final String PREFSPEEDUNIT = "/com/pulce/wristglider/prefspeedunit";
@@ -47,9 +51,28 @@ public class Statics {
         return sdf.format(new Date(time));
     }
 
-    public static String decToIgcFormat(double dec, DecimalFormat df) {
+    public static String decToIgcFormat(double dec, boolean latitude) {
+        String mark = "";
+        if (latitude) {
+            if (dec > 0) {
+                mark = "N";
+            } else {
+                mark = "S";
+            }
+        } else {
+            if (dec > 0) {
+                mark = "E";
+            } else {
+                mark = "W";
+            }
+        }
+        dec = Math.abs(dec);
         double igc = Math.floor(dec);
         double minutes = (dec - igc) * 0.6;
-        return df.format((igc + minutes) * 100000);
+        if (latitude) {
+            return latForm.format((igc + minutes) * 100000) + mark;
+        } else {
+            return lonForm.format((igc + minutes) * 100000) + mark;
+        }
     }
 }

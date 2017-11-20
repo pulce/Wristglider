@@ -3,6 +3,8 @@ apply plugin: 'com.android.application'
 android {
     compileSdkVersion project.myCompileSdkVersion.toInteger()
     buildToolsVersion project.ext.myBuildToolsVersion
+    publishNonDefault true
+
     defaultConfig {
         applicationId project.ext.myApplicationID
         minSdkVersion project.ext.myMinSdkVersion
@@ -18,6 +20,14 @@ android {
         }
         debug {
             buildConfigField "boolean", "LOG_ENABLED", "true"
+        }
+    }
+    productFlavors {
+        wear1 {
+            // Use the defaultConfig value
+        }
+        wear2 {
+            minSdkVersion 25
         }
     }
     buildToolsVersion '25.0.2'

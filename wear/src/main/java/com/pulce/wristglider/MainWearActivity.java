@@ -17,7 +17,6 @@ import android.graphics.Matrix;
 import android.graphics.drawable.BitmapDrawable;
 import android.location.Location;
 import android.os.AsyncTask;
-import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -37,7 +36,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.ErrorDialogFragment;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.PendingResult;
 import com.google.android.gms.common.api.ResultCallback;
@@ -78,8 +76,6 @@ public class MainWearActivity extends WearableActivity implements
 
     private static final String TAG = "WearMain";
 
-    private static final DecimalFormat latForm = new DecimalFormat("0000000");
-    private static final DecimalFormat lonForm = new DecimalFormat("00000000");
     private static SimpleDateFormat clockFormat;
 
     private static SharedPreferences prefs;
@@ -153,7 +149,9 @@ public class MainWearActivity extends WearableActivity implements
         } else {
             getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
-        if (prefs.getBoolean(Statics.PREFROTATEVIEW, false)) {
+        if (prefs.getString(Statics.PREFROTATEDEGREES, "0").equals("-90")) {
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE);
+        } else if (prefs.getString(Statics.PREFROTATEDEGREES, "0").equals("90")){
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         }
         if (DateFormat.is24HourFormat(this)) {
@@ -381,14 +379,6 @@ public class MainWearActivity extends WearableActivity implements
         prefs.edit().putString(Statics.PREFGLIDERID, dataMapItem.getDataMap().getString(Statics.PREFGLIDERID)).apply();
         prefs.edit().putLong(Statics.PREFLOGGERSECONDS, dataMapItem.getDataMap().getLong(Statics.PREFLOGGERSECONDS)).apply();
         prefs.edit().putBoolean(Statics.PREFLOGGERAUTO, dataMapItem.getDataMap().getBoolean(Statics.PREFLOGGERAUTO)).apply();
-        if (prefs.getBoolean(Statics.PREFROTATEVIEW, false) != dataMapItem.getDataMap().getBoolean(Statics.PREFROTATEVIEW)) {
-            if (dataMapItem.getDataMap().getBoolean(Statics.PREFROTATEVIEW)) {
-                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
-            } else {
-                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_USER);
-            }
-        }
-        prefs.edit().putBoolean(Statics.PREFROTATEVIEW, dataMapItem.getDataMap().getBoolean(Statics.PREFROTATEVIEW)).apply();
         if (prefs.getBoolean(Statics.PREFSCREENON, false) != dataMapItem.getDataMap().getBoolean(Statics.PREFSCREENON)) {
             Intent i = getBaseContext().getPackageManager()
                     .getLaunchIntentForPackage(getBaseContext().getPackageName());
@@ -399,6 +389,16 @@ public class MainWearActivity extends WearableActivity implements
         prefs.edit().putBoolean(Statics.PREFSCREENON, dataMapItem.getDataMap().getBoolean(Statics.PREFSCREENON)).apply();
         prefs.edit().putString(Statics.PREFSPEEDUNIT, dataMapItem.getDataMap().getString(Statics.PREFSPEEDUNIT)).apply();
         prefs.edit().putString(Statics.PREFHEIGTHUNIT, dataMapItem.getDataMap().getString(Statics.PREFHEIGTHUNIT)).apply();
+        if (!prefs.getString(Statics.PREFROTATEDEGREES, "0").equals(dataMapItem.getDataMap().getString(Statics.PREFROTATEDEGREES, "0"))) {
+            if (dataMapItem.getDataMap().getString(Statics.PREFROTATEDEGREES, "0").equals("-90")) {
+                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE);
+            } else if (dataMapItem.getDataMap().getString(Statics.PREFROTATEDEGREES, "0").equals("90")){
+                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+            } else {
+                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_USER);
+            }
+        }
+        prefs.edit().putString(Statics.PREFROTATEDEGREES, dataMapItem.getDataMap().getString(Statics.PREFROTATEDEGREES, "0")).apply();
         setMultipliers();
         if (debugMode) Log.d(TAG, "Preferences updated");
     }
@@ -449,10 +449,6 @@ public class MainWearActivity extends WearableActivity implements
 
     @SuppressWarnings("unchecked")
     private void requestLocationUpdates() {
-        LocationRequest locationRequest = LocationRequest.create();
-        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-        locationRequest.setInterval(1000);
-        locationRequest.setFastestInterval(900);
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             if (ActivityCompat.shouldShowRequestPermissionRationale(MainWearActivity.this,
                     Manifest.permission.ACCESS_FINE_LOCATION)) {
@@ -461,9 +457,13 @@ public class MainWearActivity extends WearableActivity implements
             ActivityCompat.requestPermissions(this,
                     new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
                     Statics.MY_PERMISSION_FINE_LOCATION);
-        } else {
-            LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, locationRequest, this);
+            return;
         }
+        LocationRequest locationRequest = LocationRequest.create();
+        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+        locationRequest.setInterval(1000);
+        locationRequest.setFastestInterval(900);
+        LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, locationRequest, this);
     }
 
 
@@ -604,8 +604,8 @@ public class MainWearActivity extends WearableActivity implements
             fos = openFileOutput(recentIgcFileName, Context.MODE_APPEND);
             pw = new PrintWriter(fos, true);
             pw.println("B" + Statics.getUTCtimeAsString(location.getTime()) +
-                    Statics.decToIgcFormat(location.getLatitude(), latForm) + "N" +
-                    Statics.decToIgcFormat(location.getLongitude(), lonForm) + "E" +
+                    Statics.decToIgcFormat(location.getLatitude(), true) +
+                    Statics.decToIgcFormat(location.getLongitude(), false) +
                     "A00000" + new DecimalFormat("00000").format(location.getAltitude() - gh.heightOffset(location.getLongitude(), location.getLatitude(), location.getAltitude())) +
                     new DecimalFormat("000").format(location.getAccuracy()));
         } catch (FileNotFoundException e) {
@@ -624,10 +624,8 @@ public class MainWearActivity extends WearableActivity implements
     public void onRequestPermissionsResult(int requestCode,
                                            @NonNull String permissions[], @NonNull int[] grantResults) {
         if (requestCode == Statics.MY_PERMISSION_FINE_LOCATION) {
-            if (grantResults.length > 0
-                    && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                requestLocationUpdates();
-            } else {
+            if (grantResults.length <= 0
+                    || grantResults[0] != PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(this, R.string.permission_fine_location_hint, Toast.LENGTH_LONG).show();
                 finish();
             }
