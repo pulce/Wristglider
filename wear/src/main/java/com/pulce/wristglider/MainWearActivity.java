@@ -153,6 +153,8 @@ public class MainWearActivity extends WearableActivity implements
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE);
         } else if (prefs.getString(Statics.PREFROTATEDEGREES, "0").equals("90")){
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        } else if (prefs.getString(Statics.PREFROTATEDEGREES, "0").equals("AUTO")){
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR);
         }
         if (DateFormat.is24HourFormat(this)) {
             clockFormat = new SimpleDateFormat("HH:mm");
@@ -394,6 +396,8 @@ public class MainWearActivity extends WearableActivity implements
                 setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE);
             } else if (dataMapItem.getDataMap().getString(Statics.PREFROTATEDEGREES, "0").equals("90")){
                 setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+            } else if (dataMapItem.getDataMap().getString(Statics.PREFROTATEDEGREES, "0").equals("AUTO")){
+                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR);
             } else {
                 setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_USER);
             }
