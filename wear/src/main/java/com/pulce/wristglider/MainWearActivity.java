@@ -1,7 +1,11 @@
 package com.pulce.wristglider;
 
 import android.Manifest;
+import android.app.Activity;
 import android.app.AlertDialog;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothSocket;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -20,6 +24,7 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Message;
 import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -60,12 +65,16 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.ObjectOutputStream;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedList;
+import java.util.Set;
+import java.util.UUID;
 
 public class MainWearActivity extends WearableActivity implements
         GoogleApiClient.ConnectionCallbacks,
@@ -118,7 +127,15 @@ public class MainWearActivity extends WearableActivity implements
     private EarthGravitationalModel gh;
 
     private BroadcastReceiver mBatInfoReceiver;
+	
+    private BluetoothAdapter mBluetoothAdapter = null;
+    private ConnectThread mBTConnectThread = null;
+    private ConnectedThread mBTConnectedThread = null;
 
+    private static final UUID MY_UUID_SECURE =
+            UUID.fromString("98ff7e78-5660-4ddf-9efd-4747ac0cb590");
+    private static final UUID MY_UUID_INSECURE =
+            UUID.fromString("1a80c066-01aa-4b82-9709-c2d56f0c9f6b");
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -252,6 +269,14 @@ public class MainWearActivity extends WearableActivity implements
                 return true;
             }
         });*/
+
+        mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+
+        // If the adapter is null, then Bluetooth is not supported
+        if (prefs.getBoolean(Statics.PREFUSEBTVARIO, false) && mBluetoothAdapter == null) {
+            if (debugMode) Log.d(TAG, "Bluetooth is not available");
+            sendBTFailed(Statics.MY_BT_FAILED_NO_BT);
+        }
     }
 
 
@@ -276,6 +301,17 @@ public class MainWearActivity extends WearableActivity implements
             }
         };
         screenUpdate.run();
+
+        if (prefs.getBoolean(Statics.PREFUSEBTVARIO, false) && mBluetoothAdapter != null) {
+            // If BT is not on, request that it be enabled.
+            if (!mBluetoothAdapter.isEnabled()) {
+                if (debugMode) Log.d(TAG, "asking to enable BT");
+                Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+                startActivityForResult(enableIntent, Statics.MY_REQUEST_ENABLE_BT);
+            } else {
+                setupBTConnection();
+            }
+        }
     }
 
     @Override
@@ -296,6 +332,7 @@ public class MainWearActivity extends WearableActivity implements
     protected void onPause() {
         super.onPause();
         if (debugMode) Log.d(TAG, "pausing");
+        Wearable.DataApi.removeListener(mGoogleApiClient, this);
     }
 
     @Override
@@ -353,6 +390,7 @@ public class MainWearActivity extends WearableActivity implements
     }
 
     private void deleteSingleIgcFile(DataItem item) {
+        item.freeze();
         DataMapItem dataMapItem = DataMapItem.fromDataItem(item);
         String filename = dataMapItem.getDataMap().getString(Statics.DATADELETE);
         File dir = getFilesDir();
@@ -399,7 +437,25 @@ public class MainWearActivity extends WearableActivity implements
             }
         }
         prefs.edit().putString(Statics.PREFROTATEDEGREES, dataMapItem.getDataMap().getString(Statics.PREFROTATEDEGREES, "0")).apply();
-        prefs.edit().putBoolean(Statics.PREFUSEBTVARIO, dataMapItem.getDataMap().getBoolean(Statics.PREFUSEBTVARIO)).apply();
+        if (prefs.getBoolean(Statics.PREFUSEBTVARIO, false) != dataMapItem.getDataMap().getBoolean(Statics.PREFUSEBTVARIO)) {
+            if (mBluetoothAdapter != null) {
+                if (dataMapItem.getDataMap().getBoolean(Statics.PREFUSEBTVARIO, false)) {
+                    // If BT is not on, request that it be enabled.
+                    if (!mBluetoothAdapter.isEnabled()) {
+                        if (debugMode) Log.d(TAG, "asking to enable BT");
+                        Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+                        startActivityForResult(enableIntent, Statics.MY_REQUEST_ENABLE_BT);
+                    } else {
+                        setupBTConnection();
+                    }
+                } else {
+                    disableBTConnection();
+                }
+                prefs.edit().putBoolean(Statics.PREFUSEBTVARIO, dataMapItem.getDataMap().getBoolean(Statics.PREFUSEBTVARIO)).apply();
+            } else {
+                sendBTFailed(Statics.MY_BT_FAILED_NO_BT);
+            }
+        }
         setMultipliers();
         if (debugMode) Log.d(TAG, "Preferences updated");
     }
@@ -689,5 +745,268 @@ public class MainWearActivity extends WearableActivity implements
         if (debugMode) Log.d(TAG, "exception thrown and caught");
         reportException(throwable);
         mDefaultUncaughtExceptionHandler.uncaughtException(thread, throwable);
+    }
+
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        switch (requestCode) {
+            case Statics.MY_REQUEST_CONNECT_DEVICE_SECURE:
+                // When DeviceListActivity returns with a device to connect
+                if (resultCode == Activity.RESULT_OK) {
+                    connectBTVarioDevice(true);
+                }
+                break;
+            case Statics.MY_REQUEST_CONNECT_DEVICE_INSECURE:
+                // When DeviceListActivity returns with a device to connect
+                if (resultCode == Activity.RESULT_OK) {
+                    connectBTVarioDevice(false);
+                }
+                break;
+            case Statics.MY_REQUEST_ENABLE_BT:
+                // When the request to enable Bluetooth returns
+                if (resultCode == Activity.RESULT_OK) {
+                    setupBTConnection();
+                } else {
+                    // User did not enable Bluetooth or an error occurred
+                    if (debugMode) Log.d(TAG, "user did not enable BT");
+                    sendBTFailed(Statics.MY_BT_FAILED_USER);
+                }
+        }
+    }
+
+    private void sendBTFailed(int reason) {
+        if (debugMode) Log.d(TAG, "disabling Use BT Vario option and sending to mobile, reason: " + reason);
+        prefs.edit().putBoolean(Statics.PREFUSEBTVARIO, false).apply();
+        PutDataMapRequest dataMap = PutDataMapRequest.create(Statics.DATABTFAILED);
+        dataMap.getDataMap().putInt("reason", reason);
+        PutDataRequest request = dataMap.asPutDataRequest();
+        request.setUrgent();
+        Wearable.DataApi.putDataItem(mGoogleApiClient, request);
+    }
+
+    private void setupBTConnection() {
+        if (mBTConnectedThread == null) {
+            if (debugMode) Log.d(TAG, "trying to setup BT connection");
+            boolean bFoundBTVario = false;
+            Set<BluetoothDevice> pairedDevices = mBluetoothAdapter.getBondedDevices();
+            if (pairedDevices.size() > 0) {
+                // There are paired devices. Get the name and address of each paired device.
+                for (BluetoothDevice device : pairedDevices) {
+                    if (prefs.getString(Statics.PREFBTVARIODEVICE, "").equals(device.getAddress())) {
+                        bFoundBTVario = true;
+                        break;
+                    }
+                }
+            }
+            if (bFoundBTVario) {
+                connectBTVarioDevice(true);
+            } else {
+                if (debugMode) Log.d(TAG, "no known BT device, user need to choose one");
+                // TODO list devices
+                sendBTFailed(Statics.MY_BT_FAILED_NO_DEVICE);
+            }
+        } else {
+            if (debugMode) Log.d(TAG, "BT already connected");
+        }
+    }
+
+    private void disableBTConnection() {
+        if (debugMode) Log.d(TAG, "disabling BT connection");
+        // Cancel any thread attempting to make a connection
+        if (mBTConnectThread != null) {
+            mBTConnectThread.cancel();
+            mBTConnectThread = null;
+        }
+        // Cancel any thread currently running a connection
+        if (mBTConnectedThread != null) {
+            mBTConnectedThread.cancel();
+            mBTConnectedThread = null;
+        }
+    }
+
+    private void connectBTVarioDevice(boolean secure) {
+        // Get the BluetoothDevice object
+        BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(prefs.getString(Statics.PREFBTVARIODEVICE, ""));
+        if (device != null) {
+            // Cancel any thread attempting to make a connection
+            if (mBTConnectThread != null) {
+                if (debugMode) Log.d(TAG, "cancel pending BT connection to make a new one");
+                mBTConnectThread.cancel();
+                mBTConnectThread = null;
+            }
+            // Start the thread to connect with the given device
+            mBTConnectThread = new ConnectThread(device, secure);
+            mBTConnectThread.start();
+        }
+    }
+
+    private void connectedBT(BluetoothSocket socket, BluetoothDevice
+            device, final String socketType) {
+        if (debugMode) Log.d(TAG, "connected BT, Socket Type:" + socketType);
+        // Cancel the thread that completed the connection
+        if (mBTConnectThread != null) {
+            mBTConnectThread.cancel();
+            mBTConnectThread = null;
+        }
+        // Cancel any thread currently running a connection
+        if (mBTConnectedThread != null) {
+            mBTConnectedThread.cancel();
+            mBTConnectedThread = null;
+        }
+        // Start the thread to manage the connection and perform transmissions
+        mBTConnectedThread = new ConnectedThread(socket, socketType);
+        mBTConnectedThread.start();
+    }
+
+    private void connectionBTFailed() {
+        if (debugMode) Log.d(TAG, "connection BT failed");
+        // TODO disable BT pref
+    }
+
+    private void connectionBTLost() {
+        if (debugMode) Log.d(TAG, "connection BT lost");
+        // TODO reconnect
+    }
+
+    private class ConnectThread extends Thread {
+        private final BluetoothSocket mmSocket;
+        private final BluetoothDevice mmDevice;
+        private String mSocketType;
+
+        public ConnectThread(BluetoothDevice device, boolean secure) {
+            // Use a temporary object that is later assigned to mmSocket
+            // because mmSocket is final.
+            BluetoothSocket tmp = null;
+            mmDevice = device;
+            mSocketType = secure ? "Secure" : "Insecure";
+
+            try {
+                if (secure) {
+                    tmp = device.createRfcommSocketToServiceRecord(
+                            MY_UUID_SECURE);
+                } else {
+                    tmp = device.createInsecureRfcommSocketToServiceRecord(
+                            MY_UUID_INSECURE);
+                }
+            } catch (IOException e) {
+                Log.e(TAG, "Socket's create() method failed", e);
+            }
+            mmSocket = tmp;
+        }
+
+        public void run() {
+            // Cancel discovery because it otherwise slows down the connection.
+            //mBluetoothAdapter.cancelDiscovery();
+
+            try {
+                // Connect to the remote device through the socket. This call blocks
+                // until it succeeds or throws an exception.
+                mmSocket.connect();
+            } catch (IOException connectException) {
+                // Unable to connect; close the socket and return.
+                try {
+                    mmSocket.close();
+                } catch (IOException closeException) {
+                    Log.e(TAG, "Could not close the client socket", closeException);
+                }
+                connectionBTFailed();
+                return;
+            }
+
+            // Start the connected thread
+            connectedBT(mmSocket, mmDevice, mSocketType);
+        }
+
+        // Closes the client socket and causes the thread to finish.
+        public void cancel() {
+            try {
+                mmSocket.close();
+            } catch (IOException e) {
+                Log.e(TAG, "Could not close the client socket", e);
+            }
+        }
+    }
+
+    private class ConnectedThread extends Thread {
+        private final BluetoothSocket mmSocket;
+        private final InputStream mmInStream;
+        private final OutputStream mmOutStream;
+        private byte[] mmBuffer; // mmBuffer store for the stream
+
+        public ConnectedThread(BluetoothSocket socket, String socketType) {
+            if (debugMode) Log.d(TAG, "create ConnectedThread: " + socketType);
+            mmSocket = socket;
+            InputStream tmpIn = null;
+            OutputStream tmpOut = null;
+
+            // Get the input and output streams; using temp objects because
+            // member streams are final.
+            try {
+                tmpIn = socket.getInputStream();
+            } catch (IOException e) {
+                Log.e(TAG, "Error occurred when creating input stream", e);
+            }
+            try {
+                tmpOut = socket.getOutputStream();
+            } catch (IOException e) {
+                Log.e(TAG, "Error occurred when creating output stream", e);
+            }
+
+            mmInStream = tmpIn;
+            mmOutStream = tmpOut;
+        }
+
+        public void run() {
+            mmBuffer = new byte[1024];
+            int numBytes; // bytes returned from read()
+
+            // Keep listening to the InputStream until an exception occurs.
+            while (true) {
+                try {
+                    // Read from the InputStream.
+                    numBytes = mmInStream.read(mmBuffer);
+                    // Send the obtained bytes to the UI activity.
+                    Message readMsg = mHandler.obtainMessage(
+                            Statics.MY_BT_MESSAGE_READ, numBytes, -1,
+                            mmBuffer);
+                    readMsg.sendToTarget();
+                } catch (IOException e) {
+                    Log.e(TAG, "Input stream was disconnected", e);
+                    connectionBTLost();
+                    break;
+                }
+            }
+        }
+
+        // Call this from the main activity to send data to the remote device.
+        public void write(byte[] bytes) {
+            try {
+                mmOutStream.write(bytes);
+
+                // Share the sent message with the UI activity.
+                Message writtenMsg = mHandler.obtainMessage(
+                        Statics.MY_BT_MESSAGE_WRITE, -1, -1, mmBuffer);
+                writtenMsg.sendToTarget();
+            } catch (IOException e) {
+                Log.e(TAG, "Error occurred when sending data", e);
+
+                // Send a failure message back to the activity.
+                /*Message writeErrorMsg =
+                        mHandler.obtainMessage(MessageConstants.MESSAGE_TOAST);
+                Bundle bundle = new Bundle();
+                bundle.putString("toast",
+                        "Couldn't send data to the other device");
+                writeErrorMsg.setData(bundle);
+                mHandler.sendMessage(writeErrorMsg);*/
+            }
+        }
+
+        // Call this method from the main activity to shut down the connection.
+        public void cancel() {
+            try {
+                mmSocket.close();
+            } catch (IOException e) {
+                Log.e(TAG, "Could not close the connect socket", e);
+            }
+        }
     }
 }

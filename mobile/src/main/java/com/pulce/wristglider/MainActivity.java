@@ -77,6 +77,8 @@ public class MainActivity extends Activity implements
     private GoogleApiClient mGoogleApiClient;
     private TableLayout tablelayout;
 
+    private CheckBox checkBoxBT;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -114,6 +116,7 @@ public class MainActivity extends Activity implements
     @Override
     public void onPause() {
         super.onPause();
+        Wearable.DataApi.removeListener(mGoogleApiClient, this);
     }
 
     @Override
@@ -135,6 +138,10 @@ public class MainActivity extends Activity implements
             if (event.getType() == DataEvent.TYPE_CHANGED &&
                     event.getDataItem().getUri().getPath().contains(Statics.DATATHROWABLE)) {
                 getExceptionFromWear(event.getDataItem());
+            }
+            if (event.getType() == DataEvent.TYPE_CHANGED &&
+                    event.getDataItem().getUri().getPath().contains(Statics.DATABTFAILED)) {
+                getBTFailed(event.getDataItem());
             }
         }
     }
@@ -190,6 +197,9 @@ public class MainActivity extends Activity implements
                         }
                         if (item.getUri().getPath().contains(Statics.DATATHROWABLE)) {
                             getExceptionFromWear(item);
+                        }
+                        if (item.getUri().getPath().contains(Statics.DATABTFAILED)) {
+                            getBTFailed(item);
                         }
                     }
                 }
@@ -463,6 +473,7 @@ public class MainActivity extends Activity implements
                     }
                 });
                 tr.addView(cp2);
+                if (preferencekey.equals(Statics.PREFUSEBTVARIO)) checkBoxBT = cp2;
                 break;
             case Statics.PREFHEIGTHUNIT:
             case Statics.PREFSPEEDUNIT:
@@ -584,4 +595,14 @@ public class MainActivity extends Activity implements
         }
     }
 
+    private void getBTFailed(DataItem dataItem) {
+        dataItem.freeze();
+        final Uri dataItemUri = dataItem.getUri();
+        DataMapItem dataMapItem = DataMapItem.fromDataItem(dataItem);
+        final int reason = dataMapItem.getDataMap().getInt("reason");
+        Wearable.DataApi.deleteDataItems(mGoogleApiClient, dataItemUri);
+        prefs.edit().putBoolean(Statics.PREFUSEBTVARIO, false).apply();
+        checkBoxBT.setChecked(false);
+        if (debugMode) Log.d(TAG, "BT failed on wear, reason: " + reason);
+    }
 }
