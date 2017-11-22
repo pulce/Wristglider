@@ -12,9 +12,7 @@ public class Statics {
     public static final int MY_PERMISSION_WRITE_STORAGE = 42;
     public static final int MY_PERMISSION_FINE_LOCATION = 43;
 
-    public static final int MY_REQUEST_CONNECT_DEVICE_SECURE = 1;
-    public static final int MY_REQUEST_CONNECT_DEVICE_INSECURE = 2;
-    public static final int MY_REQUEST_ENABLE_BT = 3;
+    public static final int MY_REQUEST_ENABLE_BT = 1;
 
     public static final int MY_BT_FAILED_NO_BT = 1;
     public static final int MY_BT_FAILED_NO_DEVICE = 2;

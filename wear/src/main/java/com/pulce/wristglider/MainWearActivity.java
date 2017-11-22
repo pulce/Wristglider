@@ -59,6 +59,7 @@ import com.google.android.gms.wearable.PutDataRequest;
 import com.google.android.gms.wearable.Wearable;
 import com.pulce.commonclasses.Statics;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -66,6 +67,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
@@ -110,8 +112,6 @@ public class MainWearActivity extends WearableActivity implements
 
     private GoogleApiClient mGoogleApiClient;
 
-    private Handler mHandler;
-
     private Thread.UncaughtExceptionHandler mDefaultUncaughtExceptionHandler;
 
     private LinkedList<Location> pointStack;
@@ -133,9 +133,32 @@ public class MainWearActivity extends WearableActivity implements
     private ConnectedThread mBTConnectedThread = null;
 
     private static final UUID MY_UUID_SECURE =
-            UUID.fromString("98ff7e78-5660-4ddf-9efd-4747ac0cb590");
+            UUID.fromString("00001101-0000-1000-8000-00805f9b34fb");
     private static final UUID MY_UUID_INSECURE =
-            UUID.fromString("1a80c066-01aa-4b82-9709-c2d56f0c9f6b");
+            UUID.fromString("00001101-0000-1000-8000-00805f9b34fb");
+
+    private final Handler mHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            switch (msg.what) {
+                case Statics.MY_BT_MESSAGE_WRITE:
+                    byte[] writeBuf = (byte[]) msg.obj;
+                    // construct a string from the buffer
+                    String writeMessage = new String(writeBuf);
+                    //if (debugMode) Log.d(TAG, "BT write message: " + writeMessage);
+                    break;
+                case Statics.MY_BT_MESSAGE_READ:
+                    String readMessage = (String) msg.obj;
+                    /*byte[] readBuf = (byte[]) msg.obj;
+                    // construct a string from the valid bytes in the buffer
+                    String readMessage = new String(readBuf, 0, msg.arg1);*/
+                    //if (debugMode) Log.d(TAG, "BT read message: " + readMessage);
+                    if (readMessage.startsWith("$LK8EX1")) parseLK8EX1Vario(readMessage);
+                    else if (readMessage.startsWith("$PTAS1")) parseGenericVario(readMessage);
+                    break;
+            }
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -216,11 +239,13 @@ public class MainWearActivity extends WearableActivity implements
                             .setTitle(R.string.stop_logger)
                             .setMessage(R.string.stop_logger_confirm)
                             .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
+                                @Override
                                 public void onClick(DialogInterface dialog, int which) {
                                     stopLogger();
                                 }
                             })
                             .setNegativeButton(android.R.string.no, new DialogInterface.OnClickListener() {
+                                @Override
                                 public void onClick(DialogInterface dialog, int which) {
                                 }
                             })
@@ -271,12 +296,6 @@ public class MainWearActivity extends WearableActivity implements
         });*/
 
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-
-        // If the adapter is null, then Bluetooth is not supported
-        if (prefs.getBoolean(Statics.PREFUSEBTVARIO, false) && mBluetoothAdapter == null) {
-            if (debugMode) Log.d(TAG, "Bluetooth is not available");
-            sendBTFailed(Statics.MY_BT_FAILED_NO_BT);
-        }
     }
 
 
@@ -286,7 +305,6 @@ public class MainWearActivity extends WearableActivity implements
         if (debugMode) Log.d(TAG, "starting");
         activityStopping = false;
         mGoogleApiClient.connect();
-        mHandler = new Handler();
         Runnable screenUpdate = new Runnable() {
             public void run() {
                 if (debugMode) Log.d(TAG, "schedule running");
@@ -305,7 +323,7 @@ public class MainWearActivity extends WearableActivity implements
         if (prefs.getBoolean(Statics.PREFUSEBTVARIO, false) && mBluetoothAdapter != null) {
             // If BT is not on, request that it be enabled.
             if (!mBluetoothAdapter.isEnabled()) {
-                if (debugMode) Log.d(TAG, "asking to enable BT");
+                if (debugMode) Log.d(TAG, "asking to enable BT on start");
                 Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
                 startActivityForResult(enableIntent, Statics.MY_REQUEST_ENABLE_BT);
             } else {
@@ -333,6 +351,13 @@ public class MainWearActivity extends WearableActivity implements
         super.onPause();
         if (debugMode) Log.d(TAG, "pausing");
         Wearable.DataApi.removeListener(mGoogleApiClient, this);
+        mGoogleApiClient.disconnect();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        mGoogleApiClient.connect();
     }
 
     @Override
@@ -449,6 +474,7 @@ public class MainWearActivity extends WearableActivity implements
                         setupBTConnection();
                     }
                 } else {
+                    prefs.edit().putString(Statics.PREFBTVARIODEVICE, "").apply();
                     disableBTConnection();
                 }
                 prefs.edit().putBoolean(Statics.PREFUSEBTVARIO, dataMapItem.getDataMap().getBoolean(Statics.PREFUSEBTVARIO)).apply();
@@ -747,20 +773,18 @@ public class MainWearActivity extends WearableActivity implements
         mDefaultUncaughtExceptionHandler.uncaughtException(thread, throwable);
     }
 
+    public void parseLK8EX1Vario(String readMessage) {
+        //if (debugMode) Log.d(TAG, "parsing LK8EX1 vario: " + readMessage);
+        // TODO parsing $LK8EX1,98668,99999,0,25,3.81,*30 - prot,preasure_hpa,alt(ignore),vario*100_in_metric,temp_c,battery_volt,checksum
+    }
+
+    public void parseGenericVario(String readMessage) {
+        //if (debugMode) Log.d(TAG, "parsing generic vario: " + readMessage);
+        // TODO parsing $PTAS1,200,,2731,*12 - prot,vario*10+200_range_0-400_in_knots,average_vario(ignore),baro_alt_in_feet_+2000,checksum
+    }
+
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         switch (requestCode) {
-            case Statics.MY_REQUEST_CONNECT_DEVICE_SECURE:
-                // When DeviceListActivity returns with a device to connect
-                if (resultCode == Activity.RESULT_OK) {
-                    connectBTVarioDevice(true);
-                }
-                break;
-            case Statics.MY_REQUEST_CONNECT_DEVICE_INSECURE:
-                // When DeviceListActivity returns with a device to connect
-                if (resultCode == Activity.RESULT_OK) {
-                    connectBTVarioDevice(false);
-                }
-                break;
             case Statics.MY_REQUEST_ENABLE_BT:
                 // When the request to enable Bluetooth returns
                 if (resultCode == Activity.RESULT_OK) {
@@ -769,6 +793,7 @@ public class MainWearActivity extends WearableActivity implements
                     // User did not enable Bluetooth or an error occurred
                     if (debugMode) Log.d(TAG, "user did not enable BT");
                     sendBTFailed(Statics.MY_BT_FAILED_USER);
+                    // TODO Check why there is 2 requests to enable BT when declined
                 }
         }
     }
@@ -789,19 +814,45 @@ public class MainWearActivity extends WearableActivity implements
             boolean bFoundBTVario = false;
             Set<BluetoothDevice> pairedDevices = mBluetoothAdapter.getBondedDevices();
             if (pairedDevices.size() > 0) {
+                final String[] pairedDevicesStrings = new String[pairedDevices.size()];
+                int i = 0;
                 // There are paired devices. Get the name and address of each paired device.
                 for (BluetoothDevice device : pairedDevices) {
+                    pairedDevicesStrings[i++] = device.getName() + "\n" + device.getAddress();
                     if (prefs.getString(Statics.PREFBTVARIODEVICE, "").equals(device.getAddress())) {
                         bFoundBTVario = true;
                         break;
                     }
                 }
-            }
-            if (bFoundBTVario) {
-                connectBTVarioDevice(true);
+                if (bFoundBTVario) {
+                    connectBTVarioDevice(true);
+                } else {
+                    if (debugMode) Log.d(TAG, "no known BT device, user need to choose one");
+                    final AlertDialog.Builder dialog = new AlertDialog.Builder(MainWearActivity.this)
+                            .setTitle(R.string.choose_bt_device)
+                            .setSingleChoiceItems(pairedDevicesStrings, -1, new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    if (debugMode) Log.d(TAG, "selected BT device: " + pairedDevicesStrings[which] + ", adress: " + pairedDevicesStrings[which].substring(pairedDevicesStrings[which].length() - 17));
+                                    prefs.edit().putString(Statics.PREFBTVARIODEVICE, pairedDevicesStrings[which].substring(pairedDevicesStrings[which].length() - 17)).apply();
+                                }
+                            })
+                            .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    connectBTVarioDevice(true);
+                                }
+                            })
+                            .setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    sendBTFailed(Statics.MY_BT_FAILED_USER);
+                                }
+                            });
+                    final AlertDialog alert = dialog.create();
+                    alert.show();
+                }
             } else {
-                if (debugMode) Log.d(TAG, "no known BT device, user need to choose one");
-                // TODO list devices
                 sendBTFailed(Statics.MY_BT_FAILED_NO_DEVICE);
             }
         } else {
@@ -811,22 +862,34 @@ public class MainWearActivity extends WearableActivity implements
 
     private void disableBTConnection() {
         if (debugMode) Log.d(TAG, "disabling BT connection");
-        // Cancel any thread attempting to make a connection
-        if (mBTConnectThread != null) {
-            mBTConnectThread.cancel();
-            mBTConnectThread = null;
-        }
         // Cancel any thread currently running a connection
         if (mBTConnectedThread != null) {
             mBTConnectedThread.cancel();
             mBTConnectedThread = null;
         }
+        // Cancel any thread attempting to make a connection
+        if (mBTConnectThread != null) {
+            mBTConnectThread.cancel();
+            mBTConnectThread = null;
+        }
     }
 
     private void connectBTVarioDevice(boolean secure) {
         // Get the BluetoothDevice object
-        BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(prefs.getString(Statics.PREFBTVARIODEVICE, ""));
+        BluetoothDevice device = null;
+        try {
+            device = mBluetoothAdapter.getRemoteDevice(prefs.getString(Statics.PREFBTVARIODEVICE, ""));
+        } catch (IllegalArgumentException e) {
+            if (debugMode) Log.d(TAG, "device address invalid");
+            sendBTFailed(Statics.MY_BT_FAILED_NO_DEVICE);
+        }
         if (device != null) {
+            // Cancel any thread currently running a connection
+            if (mBTConnectedThread != null) {
+                if (debugMode) Log.d(TAG, "cancel estabilished BT connection to make a new one");
+                mBTConnectedThread.cancel();
+                mBTConnectedThread = null;
+            }
             // Cancel any thread attempting to make a connection
             if (mBTConnectThread != null) {
                 if (debugMode) Log.d(TAG, "cancel pending BT connection to make a new one");
@@ -836,22 +899,15 @@ public class MainWearActivity extends WearableActivity implements
             // Start the thread to connect with the given device
             mBTConnectThread = new ConnectThread(device, secure);
             mBTConnectThread.start();
+        } else {
+            if (debugMode) Log.d(TAG, "selected BT device not found");
+            sendBTFailed(Statics.MY_BT_FAILED_NO_DEVICE);
         }
     }
 
     private void connectedBT(BluetoothSocket socket, BluetoothDevice
             device, final String socketType) {
         if (debugMode) Log.d(TAG, "connected BT, Socket Type:" + socketType);
-        // Cancel the thread that completed the connection
-        if (mBTConnectThread != null) {
-            mBTConnectThread.cancel();
-            mBTConnectThread = null;
-        }
-        // Cancel any thread currently running a connection
-        if (mBTConnectedThread != null) {
-            mBTConnectedThread.cancel();
-            mBTConnectedThread = null;
-        }
         // Start the thread to manage the connection and perform transmissions
         mBTConnectedThread = new ConnectedThread(socket, socketType);
         mBTConnectedThread.start();
@@ -859,7 +915,7 @@ public class MainWearActivity extends WearableActivity implements
 
     private void connectionBTFailed() {
         if (debugMode) Log.d(TAG, "connection BT failed");
-        // TODO disable BT pref
+        // TODO reconnect after some delay
     }
 
     private void connectionBTLost() {
@@ -908,6 +964,7 @@ public class MainWearActivity extends WearableActivity implements
                 } catch (IOException closeException) {
                     Log.e(TAG, "Could not close the client socket", closeException);
                 }
+                if (debugMode) Log.e(TAG, "mmSocket connect failed: ", connectException);
                 connectionBTFailed();
                 return;
             }
@@ -930,18 +987,21 @@ public class MainWearActivity extends WearableActivity implements
         private final BluetoothSocket mmSocket;
         private final InputStream mmInStream;
         private final OutputStream mmOutStream;
-        private byte[] mmBuffer; // mmBuffer store for the stream
+        //private byte[] mmBuffer; // mmBuffer store for the stream
+        private final BufferedReader mmReader; // mmReader for raed whole line
 
         public ConnectedThread(BluetoothSocket socket, String socketType) {
             if (debugMode) Log.d(TAG, "create ConnectedThread: " + socketType);
             mmSocket = socket;
             InputStream tmpIn = null;
             OutputStream tmpOut = null;
+            BufferedReader tmpReader = null;
 
             // Get the input and output streams; using temp objects because
             // member streams are final.
             try {
                 tmpIn = socket.getInputStream();
+                tmpReader = new BufferedReader(new InputStreamReader(tmpIn), 256);
             } catch (IOException e) {
                 Log.e(TAG, "Error occurred when creating input stream", e);
             }
@@ -953,21 +1013,28 @@ public class MainWearActivity extends WearableActivity implements
 
             mmInStream = tmpIn;
             mmOutStream = tmpOut;
+            mmReader = tmpReader;
         }
 
         public void run() {
-            mmBuffer = new byte[1024];
+            //mmBuffer = new byte[1024];
             int numBytes; // bytes returned from read()
+            String line = null;
 
             // Keep listening to the InputStream until an exception occurs.
             while (true) {
                 try {
-                    // Read from the InputStream.
+                    line = mmReader.readLine();
+                    numBytes = line.length();
+                    Message readMsg = mHandler.obtainMessage(
+                            Statics.MY_BT_MESSAGE_READ, numBytes, -1,
+                            line);
+                    /*// Read from the InputStream.
                     numBytes = mmInStream.read(mmBuffer);
                     // Send the obtained bytes to the UI activity.
                     Message readMsg = mHandler.obtainMessage(
                             Statics.MY_BT_MESSAGE_READ, numBytes, -1,
-                            mmBuffer);
+                            mmBuffer);*/
                     readMsg.sendToTarget();
                 } catch (IOException e) {
                     Log.e(TAG, "Input stream was disconnected", e);
@@ -984,7 +1051,7 @@ public class MainWearActivity extends WearableActivity implements
 
                 // Share the sent message with the UI activity.
                 Message writtenMsg = mHandler.obtainMessage(
-                        Statics.MY_BT_MESSAGE_WRITE, -1, -1, mmBuffer);
+                        Statics.MY_BT_MESSAGE_WRITE, -1, -1, bytes);
                 writtenMsg.sendToTarget();
             } catch (IOException e) {
                 Log.e(TAG, "Error occurred when sending data", e);

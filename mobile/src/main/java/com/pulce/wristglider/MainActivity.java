@@ -104,12 +104,12 @@ public class MainActivity extends Activity implements
         mGoogleApiClient = new GoogleApiClient.Builder(this)
                 .addConnectionCallbacks(this)
                 .addApi(Wearable.API).build();
-        mGoogleApiClient.connect();
     }
 
     @Override
     public void onResume() {
         super.onResume();
+        mGoogleApiClient.connect();
     }
 
 
@@ -117,6 +117,7 @@ public class MainActivity extends Activity implements
     public void onPause() {
         super.onPause();
         Wearable.DataApi.removeListener(mGoogleApiClient, this);
+        mGoogleApiClient.disconnect();
     }
 
     @Override
@@ -600,9 +601,20 @@ public class MainActivity extends Activity implements
         final Uri dataItemUri = dataItem.getUri();
         DataMapItem dataMapItem = DataMapItem.fromDataItem(dataItem);
         final int reason = dataMapItem.getDataMap().getInt("reason");
+        if (debugMode) Log.d(TAG, "BT failed on wear, reason: " + reason);
+        switch (reason) {
+            case Statics.MY_BT_FAILED_NO_BT:
+                Toast.makeText(getApplicationContext(), R.string.bt_failed_no_bt, Toast.LENGTH_LONG).show();
+                break;
+            case Statics.MY_BT_FAILED_NO_DEVICE:
+                Toast.makeText(getApplicationContext(), R.string.bt_failed_no_device, Toast.LENGTH_LONG).show();
+                break;
+            case Statics.MY_BT_FAILED_USER:
+                Toast.makeText(getApplicationContext(), R.string.bt_failed_user, Toast.LENGTH_LONG).show();
+                break;
+        }
         Wearable.DataApi.deleteDataItems(mGoogleApiClient, dataItemUri);
         prefs.edit().putBoolean(Statics.PREFUSEBTVARIO, false).apply();
         checkBoxBT.setChecked(false);
-        if (debugMode) Log.d(TAG, "BT failed on wear, reason: " + reason);
     }
 }
