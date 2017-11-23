@@ -384,7 +384,7 @@ public class MainActivity extends Activity implements
                             layout.addView(gliderType);
                             layout.addView(gliderID);
                             builder.setView(layout);
-                            builder.setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
+                            builder.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
                                 public void onClick(DialogInterface dialog, int whichButton) {
                                     spinnerSilent = true;
                                     spinnerArray.add(0, gliderType.getText().toString() + "\n" + gliderID.getText().toString());
@@ -396,7 +396,7 @@ public class MainActivity extends Activity implements
                                     updatePreferences();
                                 }
                             });
-                            builder.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
+                            builder.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
                                 public void onClick(DialogInterface dialog, int whichButton) {
                                     spinnerSilent = true;
                                     spinner.setSelection(spinner.lastActivePosition);
@@ -555,7 +555,7 @@ public class MainActivity extends Activity implements
                         input.setText(prefs.getString(preferencekey, ""));
                         input.setInputType(InputType.TYPE_CLASS_TEXT);
                         builder.setView(input);
-                        builder.setPositiveButton(getString(R.string.ok), new DialogInterface.OnClickListener() {
+                        builder.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 tv2.setText(input.getText().toString());
@@ -566,7 +566,7 @@ public class MainActivity extends Activity implements
                                 if (debugMode) Log.d(TAG, "Updating Preferences");
                             }
                         });
-                        builder.setNegativeButton(getString(R.string.cancel), new DialogInterface.OnClickListener() {
+                        builder.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 dialog.cancel();

@@ -24,6 +24,7 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.Message;
 import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
@@ -159,6 +160,22 @@ public class MainWearActivity extends WearableActivity implements
             }
         }
     };
+
+    private class VarioData {
+        // pressure in hpa
+        public float pressure = Statics.MY_NULL_VALUE;
+        // vert speed in m/s
+        public float vario = Statics.MY_NULL_VALUE;
+        // QNE alt in m
+        public int baroAlt = Statics.MY_NULL_VALUE;
+        // tempperature in C
+        public int temperature = Statics.MY_NULL_VALUE;
+        // airspeed in m/s
+        public float airSpeed = Statics.MY_NULL_VALUE;
+        // vario battery in V
+        public float varioBatt = Statics.MY_NULL_VALUE;
+    }
+    private VarioData mVarioData = new VarioData();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -775,12 +792,72 @@ public class MainWearActivity extends WearableActivity implements
 
     public void parseLK8EX1Vario(String readMessage) {
         //if (debugMode) Log.d(TAG, "parsing LK8EX1 vario: " + readMessage);
-        // TODO parsing $LK8EX1,98668,99999,0,25,3.81,*30 - prot,preasure_hpa,alt(ignore),vario*100_in_metric,temp_c,battery_volt,checksum
+        // parsing $LK8EX1,98668,99999,0,25,3.81,*30 - prot,pressure_hpa*100,alt(baro)_in_metric,vario*100_in_metric,temp_c,battery_volt(float)_or_perc,checksum
+        String[] field = readMessage.split(",");
+
+        try {
+            float pressure = Float.parseFloat(field[1]);
+            if (pressure != 999999) mVarioData.pressure = pressure / 100;
+        } catch (NumberFormatException e) {
+            //if (debugMode) Log.d(TAG, "LK8EX1 pressure incorrect");
+        }
+
+        try {
+            int baroAlt = Integer.parseInt(field[2]);
+            if (baroAlt != 99999) mVarioData.baroAlt = baroAlt;
+        } catch (NumberFormatException e) {
+            //if (debugMode) Log.d(TAG, "LK8EX1 baro alt incorrect");
+        }
+
+        try {
+            float vario = Float.parseFloat(field[3]);
+            if (vario != 9999) mVarioData.vario = vario / 100;
+        } catch (NumberFormatException e) {
+            //if (debugMode) Log.d(TAG, "LK8EX1 vario incorrect");
+        }
+
+        try {
+            int temp = Integer.parseInt(field[4]);
+            if (temp != 99) mVarioData.temperature = temp;
+        } catch (NumberFormatException e) {
+            //if (debugMode) Log.d(TAG, "LK8EX1 temp incorrect");
+        }
+
+        try {
+            float batt = Float.parseFloat(field[5]);
+            if (batt != 999) mVarioData.varioBatt = batt;
+        } catch (NumberFormatException e) {
+            //if (debugMode) Log.d(TAG, "LK8EX1 batt incorrect");
+        }
+        //if (debugMode) Log.d(TAG, "LK8EX1 pressure: " + mVarioData.pressure + ", baro alt: " + mVarioData.baroAlt + ", vario: " + mVarioData.vario + ", temp: " + mVarioData.temperature + ", batt: " + mVarioData.varioBatt);
     }
 
     public void parseGenericVario(String readMessage) {
         //if (debugMode) Log.d(TAG, "parsing generic vario: " + readMessage);
-        // TODO parsing $PTAS1,200,,2731,*12 - prot,vario*10+200_range_0-400_in_knots,average_vario(ignore),baro_alt_in_feet_+2000,checksum
+        // parsing $PTAS1,200,,2731,*12 - prot,vario*10+200_range_0-400_in_knots,average_vario*10+200_range_0-400_in_knots,baro_alt_in_feet_+2000,airspeed_in_knots*checksum
+        String[] field = readMessage.split(",");
+
+        try {
+            float vario = Float.parseFloat(field[1]);
+            mVarioData.vario = ((vario - 200) / 10) * 0.514444444f;
+        } catch (NumberFormatException e) {
+            //if (debugMode) Log.d(TAG, "PTAS1 vario incorrect");
+        }
+
+        try {
+            int baroAlt = Integer.parseInt(field[3]);
+            mVarioData.baroAlt = Math.round((baroAlt - 2000) * 0.3048f);
+        } catch (NumberFormatException e) {
+            //if (debugMode) Log.d(TAG, "PTAS1 baro alt incorrect");
+        }
+
+        try {
+            int airSpeed = Integer.parseInt(field[4].substring(0, field[4].indexOf("*")));
+            mVarioData.airSpeed = airSpeed * 0.514444444f;
+        } catch (NumberFormatException e) {
+            //if (debugMode) Log.d(TAG, "PTAS1 speed incorrect");
+        }
+        //if (debugMode) Log.d(TAG, "generic vario: " + mVarioData.vario + ", baro alt: " + mVarioData.baroAlt + ", speed: " + mVarioData.airSpeed);
     }
 
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -800,6 +877,7 @@ public class MainWearActivity extends WearableActivity implements
 
     private void sendBTFailed(int reason) {
         if (debugMode) Log.d(TAG, "disabling Use BT Vario option and sending to mobile, reason: " + reason);
+        prefs.edit().putString(Statics.PREFBTVARIODEVICE, "").apply();
         prefs.edit().putBoolean(Statics.PREFUSEBTVARIO, false).apply();
         PutDataMapRequest dataMap = PutDataMapRequest.create(Statics.DATABTFAILED);
         dataMap.getDataMap().putInt("reason", reason);
@@ -866,6 +944,8 @@ public class MainWearActivity extends WearableActivity implements
         if (mBTConnectedThread != null) {
             mBTConnectedThread.cancel();
             mBTConnectedThread = null;
+
+            Toast.makeText(getApplicationContext(), R.string.bt_disconnect, Toast.LENGTH_LONG).show();
         }
         // Cancel any thread attempting to make a connection
         if (mBTConnectThread != null) {
@@ -881,7 +961,6 @@ public class MainWearActivity extends WearableActivity implements
             device = mBluetoothAdapter.getRemoteDevice(prefs.getString(Statics.PREFBTVARIODEVICE, ""));
         } catch (IllegalArgumentException e) {
             if (debugMode) Log.d(TAG, "device address invalid");
-            sendBTFailed(Statics.MY_BT_FAILED_NO_DEVICE);
         }
         if (device != null) {
             // Cancel any thread currently running a connection
@@ -899,6 +978,8 @@ public class MainWearActivity extends WearableActivity implements
             // Start the thread to connect with the given device
             mBTConnectThread = new ConnectThread(device, secure);
             mBTConnectThread.start();
+
+            Toast.makeText(getApplicationContext(), R.string.bt_connecting, Toast.LENGTH_LONG).show();
         } else {
             if (debugMode) Log.d(TAG, "selected BT device not found");
             sendBTFailed(Statics.MY_BT_FAILED_NO_DEVICE);
@@ -911,16 +992,32 @@ public class MainWearActivity extends WearableActivity implements
         // Start the thread to manage the connection and perform transmissions
         mBTConnectedThread = new ConnectedThread(socket, socketType);
         mBTConnectedThread.start();
+
+        Toast.makeText(getApplicationContext(), R.string.bt_connected, Toast.LENGTH_LONG).show();
     }
 
     private void connectionBTFailed() {
         if (debugMode) Log.d(TAG, "connection BT failed");
-        // TODO reconnect after some delay
+        // reconnect after some delay
+        mHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                connectBTVarioDevice(true);
+            }
+        }, 1000 * 5);
+        Toast.makeText(getApplicationContext(), R.string.bt_connection_failed, Toast.LENGTH_LONG).show();
     }
 
     private void connectionBTLost() {
         if (debugMode) Log.d(TAG, "connection BT lost");
-        // TODO reconnect
+        // reconnect after some delay
+        mHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                connectBTVarioDevice(true);
+            }
+        }, 1000);
+        Toast.makeText(getApplicationContext(), R.string.bt_connection_lost, Toast.LENGTH_LONG).show();
     }
 
     private class ConnectThread extends Thread {
@@ -964,13 +1061,23 @@ public class MainWearActivity extends WearableActivity implements
                 } catch (IOException closeException) {
                     Log.e(TAG, "Could not close the client socket", closeException);
                 }
-                if (debugMode) Log.e(TAG, "mmSocket connect failed: ", connectException);
-                connectionBTFailed();
+                //if (debugMode) Log.e(TAG, "mmSocket connect failed: ", connectException);
+                new Handler(Looper.getMainLooper()).post(new Runnable () {
+                    @Override
+                    public void run () {
+                        connectionBTFailed();
+                    }
+                });
                 return;
             }
 
             // Start the connected thread
-            connectedBT(mmSocket, mmDevice, mSocketType);
+            new Handler(Looper.getMainLooper()).post(new Runnable () {
+                @Override
+                public void run () {
+                    connectedBT(mmSocket, mmDevice, mSocketType);
+                }
+            });
         }
 
         // Closes the client socket and causes the thread to finish.
@@ -989,6 +1096,7 @@ public class MainWearActivity extends WearableActivity implements
         private final OutputStream mmOutStream;
         //private byte[] mmBuffer; // mmBuffer store for the stream
         private final BufferedReader mmReader; // mmReader for raed whole line
+        private boolean bKeepAlive = true;
 
         public ConnectedThread(BluetoothSocket socket, String socketType) {
             if (debugMode) Log.d(TAG, "create ConnectedThread: " + socketType);
@@ -1022,7 +1130,7 @@ public class MainWearActivity extends WearableActivity implements
             String line = null;
 
             // Keep listening to the InputStream until an exception occurs.
-            while (true) {
+            while (bKeepAlive) {
                 try {
                     line = mmReader.readLine();
                     numBytes = line.length();
@@ -1037,8 +1145,15 @@ public class MainWearActivity extends WearableActivity implements
                             mmBuffer);*/
                     readMsg.sendToTarget();
                 } catch (IOException e) {
-                    Log.e(TAG, "Input stream was disconnected", e);
-                    connectionBTLost();
+                    if (bKeepAlive) {
+                        Log.e(TAG, "Input stream was disconnected", e);
+                        new Handler(Looper.getMainLooper()).post(new Runnable() {
+                            @Override
+                            public void run() {
+                                connectionBTLost();
+                            }
+                        });
+                    }
                     break;
                 }
             }
@@ -1070,6 +1185,7 @@ public class MainWearActivity extends WearableActivity implements
         // Call this method from the main activity to shut down the connection.
         public void cancel() {
             try {
+            	bKeepAlive = false;
                 mmSocket.close();
             } catch (IOException e) {
                 Log.e(TAG, "Could not close the connect socket", e);

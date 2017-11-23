@@ -7,4 +7,9 @@
     <string name="logger_started">Flight started</string>
     <string name="flight_time">Flight time:</string>
     <string name="choose_bt_device">Select BT Vario</string>
+    <string name="bt_disconnect">Bluetooth disconnected</string>
+    <string name="bt_connecting">Bluetooth connecting...</string>
+    <string name="bt_connected">Bluetooth connected</string>
+    <string name="bt_connection_failed">Bluetooth connection failed</string>
+    <string name="bt_connection_lost">Bluetooth connection lost</string>
 </resources>

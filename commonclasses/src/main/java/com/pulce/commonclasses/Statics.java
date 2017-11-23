@@ -21,6 +21,8 @@ public class Statics {
     public static final int MY_BT_MESSAGE_READ = 0;
     public static final int MY_BT_MESSAGE_WRITE = 1;
 
+    public static final int MY_NULL_VALUE = -999999;
+
     private static final DecimalFormat latForm = new DecimalFormat("0000000");
     private static final DecimalFormat lonForm = new DecimalFormat("00000000");
 

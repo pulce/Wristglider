@@ -16,8 +16,6 @@
     <string name="glider">Glider</string>
     <string name="select">Select</string>
     <string name="delete">Delete</string>
-    <string name="ok">Ok</string>
-    <string name="cancel">Cancel</string>
     <string name="enter_pilot">Enter Pilot</string>
     <string name="saved_log">Saving log:</string>
     <string name="use_bt_vario">Use bluetooth vario</string>

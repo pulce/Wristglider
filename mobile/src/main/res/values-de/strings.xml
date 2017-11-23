@@ -17,12 +17,6 @@
     <string name="glider">Fluggerät</string>
     <string name="delete">Löschen</string>
     <string name="select">Auswählen</string>
-    <string name="cancel">Abbrechen</string>
-    <string name="ok">Ok</string>
     <string name="enter_pilot">Pilot eingeben</string>
     <string name="saved_log">Speichere Log:</string>
-    <string name="use_bt_vario">Use bluetooth vario</string>
-    <string name="bt_failed_no_bt">Your Wear device doesn\'t have Bluetooth adapter</string>
-    <string name="bt_failed_no_device">Bluetooth Vario device not found</string>
-    <string name="bt_failed_user">Bluetooth connection canceled by the user</string>
 </resources>

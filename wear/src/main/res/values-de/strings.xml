@@ -6,5 +6,4 @@
     <string name="stop_logger_confirm">Möchtest Du den Logger stoppen?</string>
     <string name="stop_logger">Logger Stoppen</string>
     <string name="logger_started">Flug gestartet</string>
-    <string name="choose_bt_device">Select BT Vario</string>
 </resources>
