@@ -23,4 +23,5 @@
     <string name="bt_failed_no_bt">Twój zegarek nie obsługuje Bluetooth</string>
     <string name="bt_failed_no_device">Brak urządzenia vario BT</string>
     <string name="bt_failed_user">Połączenie Bluetooth anulowane przez użytkownika</string>
+    <string name="vario_unit">Wariometr</string>
 </resources>

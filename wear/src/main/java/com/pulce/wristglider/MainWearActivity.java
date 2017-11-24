@@ -103,6 +103,10 @@ public class MainWearActivity extends WearableActivity implements
     //private TextView batteryState;
     private ProgressBar progressBar;
     private RelativeLayout coreLayout;
+    private TextView varioTextView;
+    private TextView varioMinusTextView;
+    private View[] varioBarPos = new View[10];
+    private View[] varioBarNeg = new View[10];
 
     private Bitmap arrowBitmap;
     private Matrix rotateMatrix = new Matrix();
@@ -122,6 +126,7 @@ public class MainWearActivity extends WearableActivity implements
 
     private float speedmultiplier;
     private float heightmultiplier;
+    private float variomultiplier;
 
     private boolean activityStopping;
 
@@ -156,6 +161,8 @@ public class MainWearActivity extends WearableActivity implements
                     //if (debugMode) Log.d(TAG, "BT read message: " + readMessage);
                     if (readMessage.startsWith("$LK8EX1")) parseLK8EX1Vario(readMessage);
                     else if (readMessage.startsWith("$PTAS1")) parseGenericVario(readMessage);
+
+                    updateVario();
                     break;
             }
         }
@@ -176,6 +183,8 @@ public class MainWearActivity extends WearableActivity implements
         public float varioBatt = Statics.MY_NULL_VALUE;
     }
     private VarioData mVarioData = new VarioData();
+
+    private View stdView, stdViewVario;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -217,7 +226,38 @@ public class MainWearActivity extends WearableActivity implements
             clockFormat = new SimpleDateFormat("hh:mm");
         }
 
-        setContentView(R.layout.activity_wear_main);
+        stdView = getLayoutInflater().inflate(R.layout.activity_wear_main, null);
+        stdViewVario = getLayoutInflater().inflate(R.layout.activity_wear_main_vario, null);
+        if (prefs.getBoolean(Statics.PREFUSEBTVARIO, false)) {
+            switchView(stdViewVario);
+        } else {
+            switchView(stdView);
+        }
+
+        // vario specific elements
+        varioTextView = (TextView) stdViewVario.findViewById(R.id.variotext);
+        varioMinusTextView = (TextView) stdViewVario.findViewById(R.id.variominus);
+        varioBarPos[0] = stdViewVario.findViewById(R.id.varioBar1);
+        varioBarPos[1] = stdViewVario.findViewById(R.id.varioBar2);
+        varioBarPos[2] = stdViewVario.findViewById(R.id.varioBar3);
+        varioBarPos[3] = stdViewVario.findViewById(R.id.varioBar4);
+        varioBarPos[4] = stdViewVario.findViewById(R.id.varioBar5);
+        varioBarPos[5] = stdViewVario.findViewById(R.id.varioBar6);
+        varioBarPos[6] = stdViewVario.findViewById(R.id.varioBar7);
+        varioBarPos[7] = stdViewVario.findViewById(R.id.varioBar8);
+        varioBarPos[8] = stdViewVario.findViewById(R.id.varioBar9);
+        varioBarPos[9] = stdViewVario.findViewById(R.id.varioBar10);
+        varioBarNeg[0] = stdViewVario.findViewById(R.id.varioBar_1);
+        varioBarNeg[1] = stdViewVario.findViewById(R.id.varioBar_2);
+        varioBarNeg[2] = stdViewVario.findViewById(R.id.varioBar_3);
+        varioBarNeg[3] = stdViewVario.findViewById(R.id.varioBar_4);
+        varioBarNeg[4] = stdViewVario.findViewById(R.id.varioBar_5);
+        varioBarNeg[5] = stdViewVario.findViewById(R.id.varioBar_6);
+        varioBarNeg[6] = stdViewVario.findViewById(R.id.varioBar_7);
+        varioBarNeg[7] = stdViewVario.findViewById(R.id.varioBar_8);
+        varioBarNeg[8] = stdViewVario.findViewById(R.id.varioBar_9);
+        varioBarNeg[9] = stdViewVario.findViewById(R.id.varioBar_10);
+
         setMultipliers();
 
         arrowBitmap = BitmapFactory.decodeResource(this.getResources(),
@@ -232,13 +272,7 @@ public class MainWearActivity extends WearableActivity implements
                 .addOnConnectionFailedListener(this)
                 .build();
 
-        speedTextView = (TextView) findViewById(R.id.speedtext);
-        altTextView = (TextView) findViewById(R.id.altitext);
-        directionView = (ImageView) findViewById(R.id.directionImage);
-        alternatives = (TextView) findViewById(R.id.otherfeed);
-        loggerState = (TextView) findViewById(R.id.loggerstate);
-        /*batteryState = (TextView) findViewById(R.id.batterystate);
-        mBatInfoReceiver = new BroadcastReceiver(){
+        /*mBatInfoReceiver = new BroadcastReceiver(){
             @Override
             public void onReceive(Context ctxt, Intent intent) {
                 int level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, 0);
@@ -246,51 +280,6 @@ public class MainWearActivity extends WearableActivity implements
             }
         };*/
         this.registerReceiver(this.mBatInfoReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
-        progressBar = (ProgressBar) findViewById(R.id.progress);
-        coreLayout = (RelativeLayout) findViewById(R.id.container);
-        coreLayout.setOnLongClickListener(new View.OnLongClickListener() {
-            @Override
-            public boolean onLongClick(View v) {
-                if (loggerRunning) {
-                    final AlertDialog.Builder dialog = new AlertDialog.Builder(MainWearActivity.this)
-                            .setTitle(R.string.stop_logger)
-                            .setMessage(R.string.stop_logger_confirm)
-                            .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface dialog, int which) {
-                                    stopLogger();
-                                }
-                            })
-                            .setNegativeButton(android.R.string.no, new DialogInterface.OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface dialog, int which) {
-                                }
-                            })
-                            .setIcon(android.R.drawable.ic_dialog_alert);
-                    final AlertDialog alert = dialog.create();
-                    alert.show();
-                    final Handler handler = new Handler();
-                    final Runnable runnable = new Runnable() {
-                        @Override
-                        public void run() {
-                            if (alert.isShowing()) {
-                                alert.dismiss();
-                            }
-                        }
-                    };
-                    alert.setOnDismissListener(new DialogInterface.OnDismissListener() {
-                        @Override
-                        public void onDismiss(DialogInterface dialog) {
-                            handler.removeCallbacks(runnable);
-                        }
-                    });
-                    handler.postDelayed(runnable, 3000);
-                } else {
-                    startLogger();
-                }
-                return true;
-            }
-        });
 
         if (mockup) {
             progressBar.setVisibility(View.INVISIBLE);
@@ -431,6 +420,62 @@ public class MainWearActivity extends WearableActivity implements
         }
     }
 
+    private void switchView(View newView) {
+        setContentView(newView);
+
+        speedTextView = (TextView) newView.findViewById(R.id.speedtext);
+        altTextView = (TextView) newView.findViewById(R.id.altitext);
+        directionView = (ImageView) newView.findViewById(R.id.directionImage);
+        alternatives = (TextView) newView.findViewById(R.id.otherfeed);
+        loggerState = (TextView) newView.findViewById(R.id.loggerstate);
+        //batteryState = (TextView) newView.findViewById(R.id.batterystate);
+        progressBar = (ProgressBar) newView.findViewById(R.id.progress);
+        coreLayout = (RelativeLayout) newView.findViewById(R.id.container);
+        coreLayout.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                if (loggerRunning) {
+                    final AlertDialog.Builder dialog = new AlertDialog.Builder(MainWearActivity.this)
+                            .setTitle(R.string.stop_logger)
+                            .setMessage(R.string.stop_logger_confirm)
+                            .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    stopLogger();
+                                }
+                            })
+                            .setNegativeButton(android.R.string.no, new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                }
+                            })
+                            .setIcon(android.R.drawable.ic_dialog_alert);
+                    final AlertDialog alert = dialog.create();
+                    alert.show();
+                    final Handler handler = new Handler();
+                    final Runnable runnable = new Runnable() {
+                        @Override
+                        public void run() {
+                            if (alert.isShowing()) {
+                                alert.dismiss();
+                            }
+                        }
+                    };
+                    alert.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                        @Override
+                        public void onDismiss(DialogInterface dialog) {
+                            handler.removeCallbacks(runnable);
+                        }
+                    });
+                    handler.postDelayed(runnable, 3000);
+                } else {
+                    startLogger();
+                }
+                return true;
+            }
+        });
+    }
+
     private void deleteSingleIgcFile(DataItem item) {
         item.freeze();
         DataMapItem dataMapItem = DataMapItem.fromDataItem(item);
@@ -469,6 +514,7 @@ public class MainWearActivity extends WearableActivity implements
         prefs.edit().putBoolean(Statics.PREFSCREENON, dataMapItem.getDataMap().getBoolean(Statics.PREFSCREENON)).apply();
         prefs.edit().putString(Statics.PREFSPEEDUNIT, dataMapItem.getDataMap().getString(Statics.PREFSPEEDUNIT)).apply();
         prefs.edit().putString(Statics.PREFHEIGTHUNIT, dataMapItem.getDataMap().getString(Statics.PREFHEIGTHUNIT)).apply();
+        prefs.edit().putString(Statics.PREFBTVARIOUNIT, dataMapItem.getDataMap().getString(Statics.PREFBTVARIOUNIT)).apply();
         if (!prefs.getString(Statics.PREFROTATEDEGREES, "0").equals(dataMapItem.getDataMap().getString(Statics.PREFROTATEDEGREES, "0"))) {
             if (dataMapItem.getDataMap().getString(Statics.PREFROTATEDEGREES, "0").equals("-90")) {
                 setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE);
@@ -482,6 +528,7 @@ public class MainWearActivity extends WearableActivity implements
         if (prefs.getBoolean(Statics.PREFUSEBTVARIO, false) != dataMapItem.getDataMap().getBoolean(Statics.PREFUSEBTVARIO)) {
             if (mBluetoothAdapter != null) {
                 if (dataMapItem.getDataMap().getBoolean(Statics.PREFUSEBTVARIO, false)) {
+                    switchView(stdViewVario);
                     // If BT is not on, request that it be enabled.
                     if (!mBluetoothAdapter.isEnabled()) {
                         if (debugMode) Log.d(TAG, "asking to enable BT");
@@ -491,6 +538,7 @@ public class MainWearActivity extends WearableActivity implements
                         setupBTConnection();
                     }
                 } else {
+                    switchView(stdView);
                     prefs.edit().putString(Statics.PREFBTVARIODEVICE, "").apply();
                     disableBTConnection();
                 }
@@ -745,7 +793,12 @@ public class MainWearActivity extends WearableActivity implements
         } else {
             heightmultiplier = 3.28084f;
         }
-        Log.d(TAG, "" + speedmultiplier + heightmultiplier);
+        if (prefs.getString(Statics.PREFBTVARIOUNIT, "m/s").equals("kn")) {
+            variomultiplier = 1.943844f;
+        } else {
+            variomultiplier = 1f;
+        }
+        Log.d(TAG, "" + speedmultiplier + heightmultiplier + variomultiplier);
     }
 
     private void reportException(Throwable throwable) {
@@ -858,6 +911,43 @@ public class MainWearActivity extends WearableActivity implements
             //if (debugMode) Log.d(TAG, "PTAS1 speed incorrect");
         }
         //if (debugMode) Log.d(TAG, "generic vario: " + mVarioData.vario + ", baro alt: " + mVarioData.baroAlt + ", speed: " + mVarioData.airSpeed);
+    }
+
+    private void updateVario() {
+        if (mVarioData.vario != Statics.MY_NULL_VALUE) {
+            varioTextView.setText(String.format("%.1f", Math.abs(mVarioData.vario) * variomultiplier));
+            int i = 0;
+            if (mVarioData.vario < 0) {
+                varioMinusTextView.setVisibility(View.VISIBLE);
+                for (View varBar : varioBarNeg) {
+                    if (i++ < (Math.abs(mVarioData.vario) * 2)) varBar.setVisibility(View.VISIBLE);
+                    else varBar.setVisibility(View.INVISIBLE);
+                }
+                for (View varBar : varioBarPos) {
+                    varBar.setVisibility(View.INVISIBLE);
+                }
+            }
+            else {
+                varioMinusTextView.setVisibility(View.INVISIBLE);
+                for (View varBar : varioBarPos) {
+                    if (i++ < (mVarioData.vario * 2)) varBar.setVisibility(View.VISIBLE);
+                    else varBar.setVisibility(View.INVISIBLE);
+                }
+                for (View varBar : varioBarNeg) {
+                    varBar.setVisibility(View.INVISIBLE);
+                }
+            }
+        }
+        else {
+            varioTextView.setText("--");
+            varioMinusTextView.setVisibility(View.INVISIBLE);
+            for (View varBar : varioBarNeg) {
+                varBar.setVisibility(View.VISIBLE);
+            }
+            for (View varBar : varioBarPos) {
+                varBar.setVisibility(View.VISIBLE);
+            }
+        }
     }
 
     public void onActivityResult(int requestCode, int resultCode, Intent data) {

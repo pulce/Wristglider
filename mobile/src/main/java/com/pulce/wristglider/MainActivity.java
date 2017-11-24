@@ -100,6 +100,7 @@ public class MainActivity extends Activity implements
         addTableRow(getString(R.string.height_unit), Statics.PREFHEIGTHUNIT);
         addTableRow(getString(R.string.speed_unit), Statics.PREFSPEEDUNIT);
         addTableRow(getString(R.string.use_bt_vario), Statics.PREFUSEBTVARIO);
+        addTableRow(getString(R.string.vario_unit), Statics.PREFBTVARIOUNIT);
 
         mGoogleApiClient = new GoogleApiClient.Builder(this)
                 .addConnectionCallbacks(this)
@@ -314,6 +315,7 @@ public class MainActivity extends Activity implements
         dataMap.getDataMap().putString(Statics.PREFHEIGTHUNIT, prefs.getString(Statics.PREFHEIGTHUNIT, "m"));
         dataMap.getDataMap().putString(Statics.PREFROTATEDEGREES, prefs.getString(Statics.PREFROTATEDEGREES, "0"));
         dataMap.getDataMap().putBoolean(Statics.PREFUSEBTVARIO, prefs.getBoolean(Statics.PREFUSEBTVARIO, false));
+        dataMap.getDataMap().putString(Statics.PREFBTVARIOUNIT, prefs.getString(Statics.PREFBTVARIOUNIT, "m/s"));
         PutDataRequest request = dataMap.asPutDataRequest();
         request.setUrgent();
         Wearable.DataApi.putDataItem(mGoogleApiClient, request);
@@ -478,6 +480,7 @@ public class MainActivity extends Activity implements
                 break;
             case Statics.PREFHEIGTHUNIT:
             case Statics.PREFSPEEDUNIT:
+            case Statics.PREFBTVARIOUNIT:
             case Statics.PREFLOGGERSECONDS:
             case Statics.PREFROTATEDEGREES:
                 final Spinner spinner2 = new Spinner(this);
@@ -495,6 +498,10 @@ public class MainActivity extends Activity implements
                     case Statics.PREFSPEEDUNIT:
                         spinner2Array.add("km/h");
                         spinner2Array.add("mph");
+                        spinner2Array.add("kn");
+                        break;
+                    case Statics.PREFBTVARIOUNIT:
+                        spinner2Array.add("m/s");
                         spinner2Array.add("kn");
                         break;
                     default:

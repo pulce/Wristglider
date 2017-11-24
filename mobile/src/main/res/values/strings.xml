@@ -22,4 +22,5 @@
     <string name="bt_failed_no_bt">Your Wear device doesn\'t have Bluetooth adapter</string>
     <string name="bt_failed_no_device">Bluetooth Vario device not found</string>
     <string name="bt_failed_user">Bluetooth connection canceled by the user</string>
+    <string name="vario_unit">Vario unit</string>
 </resources>
