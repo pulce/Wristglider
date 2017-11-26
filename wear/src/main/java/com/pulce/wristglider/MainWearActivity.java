@@ -26,14 +26,18 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.os.Vibrator;
 import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.wearable.activity.WearableActivity;
+import android.support.wearable.view.SwipeDismissFrameLayout;
 import android.text.format.DateFormat;
 import android.util.Log;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.WindowManager;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
@@ -102,7 +106,7 @@ public class MainWearActivity extends WearableActivity implements
     private TextView loggerState;
     //private TextView batteryState;
     private ProgressBar progressBar;
-    private RelativeLayout coreLayout;
+    private SwipeDismissFrameLayout coreLayout;
     private TextView varioTextView;
     private TextView varioMinusTextView;
     private View[] varioBarPos = new View[10];
@@ -123,6 +127,10 @@ public class MainWearActivity extends WearableActivity implements
     private Location lastLoggedLocation;
     private long startTimeOfFlight = 0;
     private int killFirstDirtylocations = 0;
+
+    private boolean displaySecAlt = false;
+    private int currentAlt = Statics.MY_NULL_VALUE;
+    private int secAltTare = Statics.MY_NULL_VALUE;
 
     private float speedmultiplier;
     private float heightmultiplier;
@@ -286,6 +294,8 @@ public class MainWearActivity extends WearableActivity implements
             speedTextView.setText("36.5");
             altTextView.setText("3585");
             directionView.setImageDrawable(getRotatedDir(30));
+            mVarioData.vario = -1.2f;
+            updateVario();
         }
 /*        alternatives.setOnLongClickListener(new View.OnLongClickListener() {
             @Override
@@ -350,6 +360,7 @@ public class MainWearActivity extends WearableActivity implements
         }
         mGoogleApiClient.disconnect();
         mHandler.removeCallbacksAndMessages(null);
+        disableBTConnection();
     }
 
     @Override
@@ -430,47 +441,119 @@ public class MainWearActivity extends WearableActivity implements
         loggerState = (TextView) newView.findViewById(R.id.loggerstate);
         //batteryState = (TextView) newView.findViewById(R.id.batterystate);
         progressBar = (ProgressBar) newView.findViewById(R.id.progress);
-        coreLayout = (RelativeLayout) newView.findViewById(R.id.container);
-        coreLayout.setOnLongClickListener(new View.OnLongClickListener() {
+        coreLayout = (SwipeDismissFrameLayout) newView.findViewById(R.id.container);
+        // overriding OnTouchListener on SwipeDismissFrameLayout will also disable SwipeToDismiss - double win for us ;)
+        coreLayout.setOnTouchListener(new View.OnTouchListener() {
+            Handler handler = new Handler();
+
+            int numberOfTaps = 0;
+            long lastTapTimeMs = 0;
+            long touchDownMs = 0;
+
             @Override
-            public boolean onLongClick(View v) {
-                if (loggerRunning) {
-                    final AlertDialog.Builder dialog = new AlertDialog.Builder(MainWearActivity.this)
-                            .setTitle(R.string.stop_logger)
-                            .setMessage(R.string.stop_logger_confirm)
-                            .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface dialog, int which) {
-                                    stopLogger();
+            public boolean onTouch(View v, MotionEvent event) {
+                switch (event.getAction()) {
+                    case MotionEvent.ACTION_DOWN:
+                        touchDownMs = System.currentTimeMillis();
+                        // long press
+                        handler.postDelayed(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (loggerRunning) {
+                                    final AlertDialog.Builder dialog = new AlertDialog.Builder(MainWearActivity.this)
+                                            .setTitle(R.string.stop_logger)
+                                            .setMessage(R.string.stop_logger_confirm)
+                                            .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
+                                                @Override
+                                                public void onClick(DialogInterface dialog, int which) {
+                                                    stopLogger();
+                                                }
+                                            })
+                                            .setNegativeButton(android.R.string.no, new DialogInterface.OnClickListener() {
+                                                @Override
+                                                public void onClick(DialogInterface dialog, int which) {
+                                                }
+                                            })
+                                            .setIcon(android.R.drawable.ic_dialog_alert);
+                                    final AlertDialog alert = dialog.create();
+                                    alert.show();
+                                    final Handler handler = new Handler();
+                                    final Runnable runnable = new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            if (alert.isShowing()) {
+                                                alert.dismiss();
+                                            }
+                                        }
+                                    };
+                                    alert.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                                        @Override
+                                        public void onDismiss(DialogInterface dialog) {
+                                            handler.removeCallbacks(runnable);
+                                        }
+                                    });
+                                    handler.postDelayed(runnable, 3000);
+                                } else {
+                                    startLogger();
                                 }
-                            })
-                            .setNegativeButton(android.R.string.no, new DialogInterface.OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface dialog, int which) {
-                                }
-                            })
-                            .setIcon(android.R.drawable.ic_dialog_alert);
-                    final AlertDialog alert = dialog.create();
-                    alert.show();
-                    final Handler handler = new Handler();
-                    final Runnable runnable = new Runnable() {
-                        @Override
-                        public void run() {
-                            if (alert.isShowing()) {
-                                alert.dismiss();
+                                Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+                                v.vibrate(100);
                             }
+                        }, ViewConfiguration.getLongPressTimeout());
+
+                        break;
+                    case MotionEvent.ACTION_UP:
+                        handler.removeCallbacksAndMessages(null);
+
+                        if ((System.currentTimeMillis() - touchDownMs) > ViewConfiguration.getTapTimeout()) {
+                            //it was not a tap
+                            numberOfTaps = 0;
+                            lastTapTimeMs = 0;
+                            break;
                         }
-                    };
-                    alert.setOnDismissListener(new DialogInterface.OnDismissListener() {
-                        @Override
-                        public void onDismiss(DialogInterface dialog) {
-                            handler.removeCallbacks(runnable);
+
+                        if (numberOfTaps > 0
+                                && (System.currentTimeMillis() - lastTapTimeMs) < ViewConfiguration.getDoubleTapTimeout()) {
+                            numberOfTaps += 1;
+                        } else {
+                            numberOfTaps = 1;
                         }
-                    });
-                    handler.postDelayed(runnable, 3000);
-                } else {
-                    startLogger();
+
+                        lastTapTimeMs = System.currentTimeMillis();
+
+                        if (numberOfTaps == 3) {
+                            //handle triple tap
+                            if (currentAlt != Statics.MY_NULL_VALUE) {
+                                // bario alt used only for secondary altitude, because we dont configure QNH for altitude AGL
+                                if (mVarioData.baroAlt != Statics.MY_NULL_VALUE) secAltTare = mVarioData.baroAlt;
+                                else secAltTare = currentAlt;
+                                displaySecAlt = true;
+                                altTextView.setText("0");
+                            }
+                        } else if (numberOfTaps == 2) {
+                            handler.postDelayed(new Runnable() {
+                                @Override
+                                public void run() {
+                                    //handle double tap
+                                    if (currentAlt != Statics.MY_NULL_VALUE && secAltTare != Statics.MY_NULL_VALUE) {
+                                        int displayAlt;
+                                        if (displaySecAlt) {
+                                            displayAlt = currentAlt;
+                                            displaySecAlt = false;
+                                        }
+                                        else {
+                                            // bario alt used only for secondary altitude, because we dont configure QNH for altitude AGL
+                                            if (mVarioData.baroAlt != Statics.MY_NULL_VALUE) displayAlt = mVarioData.baroAlt - secAltTare;
+                                            else displayAlt = currentAlt - secAltTare;
+                                            displaySecAlt = true;
+                                        }
+                                        altTextView.setText(String.format("%.0f", displayAlt * heightmultiplier));
+                                    }
+                                }
+                            }, ViewConfiguration.getDoubleTapTimeout());
+                        }
                 }
+
                 return true;
             }
         });
@@ -569,8 +652,17 @@ public class MainWearActivity extends WearableActivity implements
             if (location.hasBearing()) {
                 directionView.setImageDrawable(getRotatedDir(location.getBearing()));
             }
-            altTextView.setText(String.format("%.0f", (location.getAltitude() - gh.heightOffset(location.getLongitude(), location.getLatitude(), location.getAltitude())) * heightmultiplier));
+            currentAlt = (int) Math.round(location.getAltitude() - gh.heightOffset(location.getLongitude(), location.getLatitude(), location.getAltitude()));
+            int displayAlt;
+            if (displaySecAlt) {
+                // bario alt used only for secondary altitude, because we dont configure QNH for altitude AGL
+                if (mVarioData.baroAlt != Statics.MY_NULL_VALUE) displayAlt = mVarioData.baroAlt - secAltTare;
+                else displayAlt = currentAlt - secAltTare;
+            }
+            else displayAlt = currentAlt;
+            altTextView.setText(String.format("%.0f", displayAlt * heightmultiplier));
         } else {
+            currentAlt = Statics.MY_NULL_VALUE;
             altTextView.setText("--");
         }
         if (!location.hasBearing()) {
@@ -1092,7 +1184,7 @@ public class MainWearActivity extends WearableActivity implements
         mHandler.postDelayed(new Runnable() {
             @Override
             public void run() {
-                connectBTVarioDevice(true);
+                if (!activityStopping) connectBTVarioDevice(true);
             }
         }, 1000 * 5);
         Toast.makeText(getApplicationContext(), R.string.bt_connection_failed, Toast.LENGTH_LONG).show();
@@ -1104,7 +1196,7 @@ public class MainWearActivity extends WearableActivity implements
         mHandler.postDelayed(new Runnable() {
             @Override
             public void run() {
-                connectBTVarioDevice(true);
+                if (!activityStopping) connectBTVarioDevice(true);
             }
         }, 1000);
         Toast.makeText(getApplicationContext(), R.string.bt_connection_lost, Toast.LENGTH_LONG).show();
