@@ -490,6 +490,7 @@ public class MainActivity extends Activity implements
                         spinner2Array.add("0");
                         spinner2Array.add("90");
                         spinner2Array.add("-90");
+                        spinner2Array.add("AUTO");
                         break;
                     case Statics.PREFHEIGTHUNIT:
                         spinner2Array.add("m");
