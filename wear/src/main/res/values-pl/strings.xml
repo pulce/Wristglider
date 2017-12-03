@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Wristglider</string>
+    <string name="permission_fine_location_hint">Aplikacja wymaga uprawnienia do lokalizacji!</string>
+    <string name="stop_logger">Zatrzymanie logowania</string>
+    <string name="stop_logger_confirm">Czy na pewno chcesz zatrzymać logowanie?</string>
+    <string name="logger_started">Lot rozpoczęty</string>
+    <string name="flight_time">Czas lotu:</string>
+    <string name="choose_bt_device">Wybierz vario BT</string>
+    <string name="bt_disconnect">Bluetooth rozłączony</string>
+    <string name="bt_connecting">Łączenie z Bluetooth...</string>
+    <string name="bt_connected">Bluetooth połączony</string>
+    <string name="bt_connection_failed">Nieudane połączenie Bluetooth</string>
+    <string name="bt_connection_lost">Utracono połączenie Bluetooth</string>
+</resources>

@@ -1,7 +1,11 @@
 package com.pulce.wristglider;
 
 import android.Manifest;
+import android.app.Activity;
 import android.app.AlertDialog;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothSocket;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -20,14 +24,20 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
+import android.os.Vibrator;
 import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.wearable.activity.WearableActivity;
+import android.support.wearable.view.SwipeDismissFrameLayout;
 import android.text.format.DateFormat;
 import android.util.Log;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.WindowManager;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
@@ -54,18 +64,24 @@ import com.google.android.gms.wearable.PutDataRequest;
 import com.google.android.gms.wearable.Wearable;
 import com.pulce.commonclasses.Statics;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.ObjectOutputStream;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedList;
+import java.util.Set;
+import java.util.UUID;
 
 public class MainWearActivity extends WearableActivity implements
         GoogleApiClient.ConnectionCallbacks,
@@ -90,7 +106,11 @@ public class MainWearActivity extends WearableActivity implements
     private TextView loggerState;
     //private TextView batteryState;
     private ProgressBar progressBar;
-    private RelativeLayout coreLayout;
+    private SwipeDismissFrameLayout coreLayout;
+    private TextView varioTextView;
+    private TextView varioMinusTextView;
+    private View[] varioBarPos = new View[10];
+    private View[] varioBarNeg = new View[10];
 
     private Bitmap arrowBitmap;
     private Matrix rotateMatrix = new Matrix();
@@ -101,8 +121,6 @@ public class MainWearActivity extends WearableActivity implements
 
     private GoogleApiClient mGoogleApiClient;
 
-    private Handler mHandler;
-
     private Thread.UncaughtExceptionHandler mDefaultUncaughtExceptionHandler;
 
     private LinkedList<Location> pointStack;
@@ -110,15 +128,71 @@ public class MainWearActivity extends WearableActivity implements
     private long startTimeOfFlight = 0;
     private int killFirstDirtylocations = 0;
 
+    private boolean displaySecAlt = false;
+    private int currentAlt = Statics.MY_NULL_VALUE;
+    private int secAltTare = Statics.MY_NULL_VALUE;
+
     private float speedmultiplier;
     private float heightmultiplier;
+    private float variomultiplier;
 
     private boolean activityStopping;
 
     private EarthGravitationalModel gh;
 
     private BroadcastReceiver mBatInfoReceiver;
+	
+    private BluetoothAdapter mBluetoothAdapter = null;
+    private ConnectThread mBTConnectThread = null;
+    private ConnectedThread mBTConnectedThread = null;
 
+    private static final UUID MY_UUID_SECURE =
+            UUID.fromString("00001101-0000-1000-8000-00805f9b34fb");
+    private static final UUID MY_UUID_INSECURE =
+            UUID.fromString("00001101-0000-1000-8000-00805f9b34fb");
+
+    private final Handler mHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            switch (msg.what) {
+                case Statics.MY_BT_MESSAGE_WRITE:
+                    byte[] writeBuf = (byte[]) msg.obj;
+                    // construct a string from the buffer
+                    String writeMessage = new String(writeBuf);
+                    //if (debugMode) Log.d(TAG, "BT write message: " + writeMessage);
+                    break;
+                case Statics.MY_BT_MESSAGE_READ:
+                    String readMessage = (String) msg.obj;
+                    /*byte[] readBuf = (byte[]) msg.obj;
+                    // construct a string from the valid bytes in the buffer
+                    String readMessage = new String(readBuf, 0, msg.arg1);*/
+                    //if (debugMode) Log.d(TAG, "BT read message: " + readMessage);
+                    if (readMessage.startsWith("$LK8EX1")) parseLK8EX1Vario(readMessage);
+                    else if (readMessage.startsWith("$PTAS1")) parseGenericVario(readMessage);
+
+                    updateVario();
+                    break;
+            }
+        }
+    };
+
+    private class VarioData {
+        // pressure in hpa
+        public float pressure = Statics.MY_NULL_VALUE;
+        // vert speed in m/s
+        public float vario = Statics.MY_NULL_VALUE;
+        // QNE alt in m
+        public int baroAlt = Statics.MY_NULL_VALUE;
+        // tempperature in C
+        public int temperature = Statics.MY_NULL_VALUE;
+        // airspeed in m/s
+        public float airSpeed = Statics.MY_NULL_VALUE;
+        // vario battery in V
+        public float varioBatt = Statics.MY_NULL_VALUE;
+    }
+    private VarioData mVarioData = new VarioData();
+
+    private View stdView, stdViewVario;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -153,6 +227,8 @@ public class MainWearActivity extends WearableActivity implements
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE);
         } else if (prefs.getString(Statics.PREFROTATEDEGREES, "0").equals("90")){
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        } else if (prefs.getString(Statics.PREFROTATEDEGREES, "0").equals("AUTO")){
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR);
         }
         if (DateFormat.is24HourFormat(this)) {
             clockFormat = new SimpleDateFormat("HH:mm");
@@ -160,7 +236,38 @@ public class MainWearActivity extends WearableActivity implements
             clockFormat = new SimpleDateFormat("hh:mm");
         }
 
-        setContentView(R.layout.activity_wear_main);
+        stdView = getLayoutInflater().inflate(R.layout.activity_wear_main, null);
+        stdViewVario = getLayoutInflater().inflate(R.layout.activity_wear_main_vario, null);
+        if (prefs.getBoolean(Statics.PREFUSEBTVARIO, false)) {
+            switchView(stdViewVario);
+        } else {
+            switchView(stdView);
+        }
+
+        // vario specific elements
+        varioTextView = (TextView) stdViewVario.findViewById(R.id.variotext);
+        varioMinusTextView = (TextView) stdViewVario.findViewById(R.id.variominus);
+        varioBarPos[0] = stdViewVario.findViewById(R.id.varioBar1);
+        varioBarPos[1] = stdViewVario.findViewById(R.id.varioBar2);
+        varioBarPos[2] = stdViewVario.findViewById(R.id.varioBar3);
+        varioBarPos[3] = stdViewVario.findViewById(R.id.varioBar4);
+        varioBarPos[4] = stdViewVario.findViewById(R.id.varioBar5);
+        varioBarPos[5] = stdViewVario.findViewById(R.id.varioBar6);
+        varioBarPos[6] = stdViewVario.findViewById(R.id.varioBar7);
+        varioBarPos[7] = stdViewVario.findViewById(R.id.varioBar8);
+        varioBarPos[8] = stdViewVario.findViewById(R.id.varioBar9);
+        varioBarPos[9] = stdViewVario.findViewById(R.id.varioBar10);
+        varioBarNeg[0] = stdViewVario.findViewById(R.id.varioBar_1);
+        varioBarNeg[1] = stdViewVario.findViewById(R.id.varioBar_2);
+        varioBarNeg[2] = stdViewVario.findViewById(R.id.varioBar_3);
+        varioBarNeg[3] = stdViewVario.findViewById(R.id.varioBar_4);
+        varioBarNeg[4] = stdViewVario.findViewById(R.id.varioBar_5);
+        varioBarNeg[5] = stdViewVario.findViewById(R.id.varioBar_6);
+        varioBarNeg[6] = stdViewVario.findViewById(R.id.varioBar_7);
+        varioBarNeg[7] = stdViewVario.findViewById(R.id.varioBar_8);
+        varioBarNeg[8] = stdViewVario.findViewById(R.id.varioBar_9);
+        varioBarNeg[9] = stdViewVario.findViewById(R.id.varioBar_10);
+
         setMultipliers();
 
         arrowBitmap = BitmapFactory.decodeResource(this.getResources(),
@@ -175,13 +282,7 @@ public class MainWearActivity extends WearableActivity implements
                 .addOnConnectionFailedListener(this)
                 .build();
 
-        speedTextView = (TextView) findViewById(R.id.speedtext);
-        altTextView = (TextView) findViewById(R.id.altitext);
-        directionView = (ImageView) findViewById(R.id.directionImage);
-        alternatives = (TextView) findViewById(R.id.otherfeed);
-        loggerState = (TextView) findViewById(R.id.loggerstate);
-        /*batteryState = (TextView) findViewById(R.id.batterystate);
-        mBatInfoReceiver = new BroadcastReceiver(){
+        /*mBatInfoReceiver = new BroadcastReceiver(){
             @Override
             public void onReceive(Context ctxt, Intent intent) {
                 int level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, 0);
@@ -189,55 +290,14 @@ public class MainWearActivity extends WearableActivity implements
             }
         };*/
         this.registerReceiver(this.mBatInfoReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
-        progressBar = (ProgressBar) findViewById(R.id.progress);
-        coreLayout = (RelativeLayout) findViewById(R.id.container);
-        coreLayout.setOnLongClickListener(new View.OnLongClickListener() {
-            @Override
-            public boolean onLongClick(View v) {
-                if (loggerRunning) {
-                    final AlertDialog.Builder dialog = new AlertDialog.Builder(MainWearActivity.this)
-                            .setTitle(R.string.stop_logger)
-                            .setMessage(R.string.stop_logger_confirm)
-                            .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
-                                public void onClick(DialogInterface dialog, int which) {
-                                    stopLogger();
-                                }
-                            })
-                            .setNegativeButton(android.R.string.no, new DialogInterface.OnClickListener() {
-                                public void onClick(DialogInterface dialog, int which) {
-                                }
-                            })
-                            .setIcon(android.R.drawable.ic_dialog_alert);
-                    final AlertDialog alert = dialog.create();
-                    alert.show();
-                    final Handler handler = new Handler();
-                    final Runnable runnable = new Runnable() {
-                        @Override
-                        public void run() {
-                            if (alert.isShowing()) {
-                                alert.dismiss();
-                            }
-                        }
-                    };
-                    alert.setOnDismissListener(new DialogInterface.OnDismissListener() {
-                        @Override
-                        public void onDismiss(DialogInterface dialog) {
-                            handler.removeCallbacks(runnable);
-                        }
-                    });
-                    handler.postDelayed(runnable, 3000);
-                } else {
-                    startLogger();
-                }
-                return true;
-            }
-        });
 
         if (mockup) {
             progressBar.setVisibility(View.INVISIBLE);
             speedTextView.setText("36.5");
             altTextView.setText("3585");
             directionView.setImageDrawable(getRotatedDir(30));
+            mVarioData.vario = -1.2f;
+            updateVario();
         }
 /*        alternatives.setOnLongClickListener(new View.OnLongClickListener() {
             @Override
@@ -252,6 +312,8 @@ public class MainWearActivity extends WearableActivity implements
                 return true;
             }
         });*/
+
+        mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
     }
 
 
@@ -261,7 +323,6 @@ public class MainWearActivity extends WearableActivity implements
         if (debugMode) Log.d(TAG, "starting");
         activityStopping = false;
         mGoogleApiClient.connect();
-        mHandler = new Handler();
         Runnable screenUpdate = new Runnable() {
             public void run() {
                 if (debugMode) Log.d(TAG, "schedule running");
@@ -276,6 +337,17 @@ public class MainWearActivity extends WearableActivity implements
             }
         };
         screenUpdate.run();
+
+        if (prefs.getBoolean(Statics.PREFUSEBTVARIO, false) && mBluetoothAdapter != null) {
+            // If BT is not on, request that it be enabled.
+            if (!mBluetoothAdapter.isEnabled()) {
+                if (debugMode) Log.d(TAG, "asking to enable BT on start");
+                Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+                startActivityForResult(enableIntent, Statics.MY_REQUEST_ENABLE_BT);
+            } else {
+                setupBTConnection();
+            }
+        }
     }
 
     @Override
@@ -290,12 +362,21 @@ public class MainWearActivity extends WearableActivity implements
         }
         mGoogleApiClient.disconnect();
         mHandler.removeCallbacksAndMessages(null);
+        disableBTConnection();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         if (debugMode) Log.d(TAG, "pausing");
+        Wearable.DataApi.removeListener(mGoogleApiClient, this);
+        mGoogleApiClient.disconnect();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        mGoogleApiClient.connect();
     }
 
     @Override
@@ -352,7 +433,136 @@ public class MainWearActivity extends WearableActivity implements
         }
     }
 
+    private void switchView(View newView) {
+        setContentView(newView);
+
+        speedTextView = (TextView) newView.findViewById(R.id.speedtext);
+        altTextView = (TextView) newView.findViewById(R.id.altitext);
+        directionView = (ImageView) newView.findViewById(R.id.directionImage);
+        alternatives = (TextView) newView.findViewById(R.id.otherfeed);
+        loggerState = (TextView) newView.findViewById(R.id.loggerstate);
+        //batteryState = (TextView) newView.findViewById(R.id.batterystate);
+        progressBar = (ProgressBar) newView.findViewById(R.id.progress);
+        coreLayout = (SwipeDismissFrameLayout) newView.findViewById(R.id.container);
+        // overriding OnTouchListener on SwipeDismissFrameLayout will also disable SwipeToDismiss - double win for us ;)
+        coreLayout.setOnTouchListener(new View.OnTouchListener() {
+            Handler handler = new Handler();
+
+            int numberOfTaps = 0;
+            long lastTapTimeMs = 0;
+            long touchDownMs = 0;
+
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                switch (event.getAction()) {
+                    case MotionEvent.ACTION_DOWN:
+                        touchDownMs = System.currentTimeMillis();
+                        // long press
+                        handler.postDelayed(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (loggerRunning) {
+                                    final AlertDialog.Builder dialog = new AlertDialog.Builder(MainWearActivity.this)
+                                            .setTitle(R.string.stop_logger)
+                                            .setMessage(R.string.stop_logger_confirm)
+                                            .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
+                                                @Override
+                                                public void onClick(DialogInterface dialog, int which) {
+                                                    stopLogger();
+                                                }
+                                            })
+                                            .setNegativeButton(android.R.string.no, new DialogInterface.OnClickListener() {
+                                                @Override
+                                                public void onClick(DialogInterface dialog, int which) {
+                                                }
+                                            })
+                                            .setIcon(android.R.drawable.ic_dialog_alert);
+                                    final AlertDialog alert = dialog.create();
+                                    alert.show();
+                                    final Handler handler = new Handler();
+                                    final Runnable runnable = new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            if (alert.isShowing()) {
+                                                alert.dismiss();
+                                            }
+                                        }
+                                    };
+                                    alert.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                                        @Override
+                                        public void onDismiss(DialogInterface dialog) {
+                                            handler.removeCallbacks(runnable);
+                                        }
+                                    });
+                                    handler.postDelayed(runnable, 3000);
+                                } else {
+                                    startLogger();
+                                }
+                                Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+                                v.vibrate(100);
+                            }
+                        }, ViewConfiguration.getLongPressTimeout());
+
+                        break;
+                    case MotionEvent.ACTION_UP:
+                        handler.removeCallbacksAndMessages(null);
+
+                        if ((System.currentTimeMillis() - touchDownMs) > ViewConfiguration.getTapTimeout()) {
+                            //it was not a tap
+                            numberOfTaps = 0;
+                            lastTapTimeMs = 0;
+                            break;
+                        }
+
+                        if (numberOfTaps > 0
+                                && (System.currentTimeMillis() - lastTapTimeMs) < ViewConfiguration.getDoubleTapTimeout()) {
+                            numberOfTaps += 1;
+                        } else {
+                            numberOfTaps = 1;
+                        }
+
+                        lastTapTimeMs = System.currentTimeMillis();
+
+                        if (numberOfTaps == 3) {
+                            //handle triple tap
+                            if (currentAlt != Statics.MY_NULL_VALUE) {
+                                // bario alt used only for secondary altitude, because we dont configure QNH for altitude AGL
+                                if (mVarioData.baroAlt != Statics.MY_NULL_VALUE) secAltTare = mVarioData.baroAlt;
+                                else secAltTare = currentAlt;
+                                displaySecAlt = true;
+                                altTextView.setText("0");
+                            }
+                        } else if (numberOfTaps == 2) {
+                            handler.postDelayed(new Runnable() {
+                                @Override
+                                public void run() {
+                                    //handle double tap
+                                    if (currentAlt != Statics.MY_NULL_VALUE && secAltTare != Statics.MY_NULL_VALUE) {
+                                        int displayAlt;
+                                        if (displaySecAlt) {
+                                            displayAlt = currentAlt;
+                                            displaySecAlt = false;
+                                        }
+                                        else {
+                                            // bario alt used only for secondary altitude, because we dont configure QNH for altitude AGL
+                                            if (mVarioData.baroAlt != Statics.MY_NULL_VALUE) displayAlt = mVarioData.baroAlt - secAltTare;
+                                            else displayAlt = currentAlt - secAltTare;
+                                            displaySecAlt = true;
+                                        }
+                                        altTextView.setText(String.format("%.0f", displayAlt * heightmultiplier));
+                                    }
+                                }
+                            }, ViewConfiguration.getDoubleTapTimeout());
+                        }
+                }
+
+                return true;
+            }
+        });
+    }
+
     private void deleteSingleIgcFile(DataItem item) {
+        item.freeze();
         DataMapItem dataMapItem = DataMapItem.fromDataItem(item);
         String filename = dataMapItem.getDataMap().getString(Statics.DATADELETE);
         File dir = getFilesDir();
@@ -389,16 +599,41 @@ public class MainWearActivity extends WearableActivity implements
         prefs.edit().putBoolean(Statics.PREFSCREENON, dataMapItem.getDataMap().getBoolean(Statics.PREFSCREENON)).apply();
         prefs.edit().putString(Statics.PREFSPEEDUNIT, dataMapItem.getDataMap().getString(Statics.PREFSPEEDUNIT)).apply();
         prefs.edit().putString(Statics.PREFHEIGTHUNIT, dataMapItem.getDataMap().getString(Statics.PREFHEIGTHUNIT)).apply();
+        prefs.edit().putString(Statics.PREFBTVARIOUNIT, dataMapItem.getDataMap().getString(Statics.PREFBTVARIOUNIT)).apply();
         if (!prefs.getString(Statics.PREFROTATEDEGREES, "0").equals(dataMapItem.getDataMap().getString(Statics.PREFROTATEDEGREES, "0"))) {
             if (dataMapItem.getDataMap().getString(Statics.PREFROTATEDEGREES, "0").equals("-90")) {
                 setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE);
             } else if (dataMapItem.getDataMap().getString(Statics.PREFROTATEDEGREES, "0").equals("90")){
                 setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+            } else if (dataMapItem.getDataMap().getString(Statics.PREFROTATEDEGREES, "0").equals("AUTO")){
+                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR);
             } else {
                 setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_USER);
             }
         }
         prefs.edit().putString(Statics.PREFROTATEDEGREES, dataMapItem.getDataMap().getString(Statics.PREFROTATEDEGREES, "0")).apply();
+        if (prefs.getBoolean(Statics.PREFUSEBTVARIO, false) != dataMapItem.getDataMap().getBoolean(Statics.PREFUSEBTVARIO)) {
+            if (mBluetoothAdapter != null) {
+                if (dataMapItem.getDataMap().getBoolean(Statics.PREFUSEBTVARIO, false)) {
+                    switchView(stdViewVario);
+                    // If BT is not on, request that it be enabled.
+                    if (!mBluetoothAdapter.isEnabled()) {
+                        if (debugMode) Log.d(TAG, "asking to enable BT");
+                        Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+                        startActivityForResult(enableIntent, Statics.MY_REQUEST_ENABLE_BT);
+                    } else {
+                        setupBTConnection();
+                    }
+                } else {
+                    switchView(stdView);
+                    prefs.edit().putString(Statics.PREFBTVARIODEVICE, "").apply();
+                    disableBTConnection();
+                }
+                prefs.edit().putBoolean(Statics.PREFUSEBTVARIO, dataMapItem.getDataMap().getBoolean(Statics.PREFUSEBTVARIO)).apply();
+            } else {
+                sendBTFailed(Statics.MY_BT_FAILED_NO_BT);
+            }
+        }
         setMultipliers();
         if (debugMode) Log.d(TAG, "Preferences updated");
     }
@@ -421,8 +656,17 @@ public class MainWearActivity extends WearableActivity implements
             if (location.hasBearing()) {
                 directionView.setImageDrawable(getRotatedDir(location.getBearing()));
             }
-            altTextView.setText(String.format("%.0f", (location.getAltitude() - gh.heightOffset(location.getLongitude(), location.getLatitude(), location.getAltitude())) * heightmultiplier));
+            currentAlt = (int) Math.round(location.getAltitude() - gh.heightOffset(location.getLongitude(), location.getLatitude(), location.getAltitude()));
+            int displayAlt;
+            if (displaySecAlt) {
+                // bario alt used only for secondary altitude, because we dont configure QNH for altitude AGL
+                if (mVarioData.baroAlt != Statics.MY_NULL_VALUE) displayAlt = mVarioData.baroAlt - secAltTare;
+                else displayAlt = currentAlt - secAltTare;
+            }
+            else displayAlt = currentAlt;
+            altTextView.setText(String.format("%.0f", displayAlt * heightmultiplier));
         } else {
+            currentAlt = Statics.MY_NULL_VALUE;
             altTextView.setText("--");
         }
         if (!location.hasBearing()) {
@@ -645,7 +889,12 @@ public class MainWearActivity extends WearableActivity implements
         } else {
             heightmultiplier = 3.28084f;
         }
-        Log.d(TAG, "" + speedmultiplier + heightmultiplier);
+        if (prefs.getString(Statics.PREFBTVARIOUNIT, "m/s").equals("kn")) {
+            variomultiplier = 1.943844f;
+        } else {
+            variomultiplier = 1f;
+        }
+        Log.d(TAG, "" + speedmultiplier + heightmultiplier + variomultiplier);
     }
 
     private void reportException(Throwable throwable) {
@@ -688,5 +937,445 @@ public class MainWearActivity extends WearableActivity implements
         if (debugMode) Log.d(TAG, "exception thrown and caught");
         reportException(throwable);
         mDefaultUncaughtExceptionHandler.uncaughtException(thread, throwable);
+    }
+
+    public void parseLK8EX1Vario(String readMessage) {
+        //if (debugMode) Log.d(TAG, "parsing LK8EX1 vario: " + readMessage);
+        // parsing $LK8EX1,98668,99999,0,25,3.81,*30 - prot,pressure_hpa*100,alt(baro)_in_metric,vario*100_in_metric,temp_c,battery_volt(float)_or_perc,checksum
+        String[] field = readMessage.split(",");
+
+        try {
+            float pressure = Float.parseFloat(field[1]);
+            if (pressure != 999999) mVarioData.pressure = pressure / 100;
+        } catch (NumberFormatException e) {
+            //if (debugMode) Log.d(TAG, "LK8EX1 pressure incorrect");
+        }
+
+        try {
+            int baroAlt = Integer.parseInt(field[2]);
+            if (baroAlt != 99999) mVarioData.baroAlt = baroAlt;
+        } catch (NumberFormatException e) {
+            //if (debugMode) Log.d(TAG, "LK8EX1 baro alt incorrect");
+        }
+
+        try {
+            float vario = Float.parseFloat(field[3]);
+            if (vario != 9999) mVarioData.vario = vario / 100;
+        } catch (NumberFormatException e) {
+            //if (debugMode) Log.d(TAG, "LK8EX1 vario incorrect");
+        }
+
+        try {
+            int temp = Integer.parseInt(field[4]);
+            if (temp != 99) mVarioData.temperature = temp;
+        } catch (NumberFormatException e) {
+            //if (debugMode) Log.d(TAG, "LK8EX1 temp incorrect");
+        }
+
+        try {
+            float batt = Float.parseFloat(field[5]);
+            if (batt != 999) mVarioData.varioBatt = batt;
+        } catch (NumberFormatException e) {
+            //if (debugMode) Log.d(TAG, "LK8EX1 batt incorrect");
+        }
+        //if (debugMode) Log.d(TAG, "LK8EX1 pressure: " + mVarioData.pressure + ", baro alt: " + mVarioData.baroAlt + ", vario: " + mVarioData.vario + ", temp: " + mVarioData.temperature + ", batt: " + mVarioData.varioBatt);
+    }
+
+    public void parseGenericVario(String readMessage) {
+        //if (debugMode) Log.d(TAG, "parsing generic vario: " + readMessage);
+        // parsing $PTAS1,200,,2731,*12 - prot,vario*10+200_range_0-400_in_knots,average_vario*10+200_range_0-400_in_knots,baro_alt_in_feet_+2000,airspeed_in_knots*checksum
+        String[] field = readMessage.split(",");
+
+        try {
+            float vario = Float.parseFloat(field[1]);
+            mVarioData.vario = ((vario - 200) / 10) * 0.514444444f;
+        } catch (NumberFormatException e) {
+            //if (debugMode) Log.d(TAG, "PTAS1 vario incorrect");
+        }
+
+        try {
+            int baroAlt = Integer.parseInt(field[3]);
+            mVarioData.baroAlt = Math.round((baroAlt - 2000) * 0.3048f);
+        } catch (NumberFormatException e) {
+            //if (debugMode) Log.d(TAG, "PTAS1 baro alt incorrect");
+        }
+
+        try {
+            int airSpeed = Integer.parseInt(field[4].substring(0, field[4].indexOf("*")));
+            mVarioData.airSpeed = airSpeed * 0.514444444f;
+        } catch (NumberFormatException e) {
+            //if (debugMode) Log.d(TAG, "PTAS1 speed incorrect");
+        }
+        //if (debugMode) Log.d(TAG, "generic vario: " + mVarioData.vario + ", baro alt: " + mVarioData.baroAlt + ", speed: " + mVarioData.airSpeed);
+    }
+
+    private void updateVario() {
+        if (mVarioData.vario != Statics.MY_NULL_VALUE) {
+            varioTextView.setText(String.format("%.1f", Math.abs(mVarioData.vario) * variomultiplier));
+            int i = 0;
+            if (mVarioData.vario < 0) {
+                varioMinusTextView.setVisibility(View.VISIBLE);
+                for (View varBar : varioBarNeg) {
+                    if (i++ < (Math.abs(mVarioData.vario) * 2)) varBar.setVisibility(View.VISIBLE);
+                    else varBar.setVisibility(View.INVISIBLE);
+                }
+                for (View varBar : varioBarPos) {
+                    varBar.setVisibility(View.INVISIBLE);
+                }
+            }
+            else {
+                varioMinusTextView.setVisibility(View.INVISIBLE);
+                for (View varBar : varioBarPos) {
+                    if (i++ < (mVarioData.vario * 2)) varBar.setVisibility(View.VISIBLE);
+                    else varBar.setVisibility(View.INVISIBLE);
+                }
+                for (View varBar : varioBarNeg) {
+                    varBar.setVisibility(View.INVISIBLE);
+                }
+            }
+        }
+        else {
+            varioTextView.setText("--");
+            varioMinusTextView.setVisibility(View.INVISIBLE);
+            for (View varBar : varioBarNeg) {
+                varBar.setVisibility(View.VISIBLE);
+            }
+            for (View varBar : varioBarPos) {
+                varBar.setVisibility(View.VISIBLE);
+            }
+        }
+    }
+
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        switch (requestCode) {
+            case Statics.MY_REQUEST_ENABLE_BT:
+                // When the request to enable Bluetooth returns
+                if (resultCode == Activity.RESULT_OK) {
+                    setupBTConnection();
+                } else {
+                    // User did not enable Bluetooth or an error occurred
+                    if (debugMode) Log.d(TAG, "user did not enable BT");
+                    sendBTFailed(Statics.MY_BT_FAILED_USER);
+                    // TODO Check why there is 2 requests to enable BT when declined
+                }
+        }
+    }
+
+    private void sendBTFailed(int reason) {
+        if (debugMode) Log.d(TAG, "disabling Use BT Vario option and sending to mobile, reason: " + reason);
+        prefs.edit().putString(Statics.PREFBTVARIODEVICE, "").apply();
+        prefs.edit().putBoolean(Statics.PREFUSEBTVARIO, false).apply();
+        PutDataMapRequest dataMap = PutDataMapRequest.create(Statics.DATABTFAILED);
+        dataMap.getDataMap().putInt("reason", reason);
+        PutDataRequest request = dataMap.asPutDataRequest();
+        request.setUrgent();
+        Wearable.DataApi.putDataItem(mGoogleApiClient, request);
+    }
+
+    private void setupBTConnection() {
+        if (mBTConnectedThread == null) {
+            if (debugMode) Log.d(TAG, "trying to setup BT connection");
+            boolean bFoundBTVario = false;
+            Set<BluetoothDevice> pairedDevices = mBluetoothAdapter.getBondedDevices();
+            if (pairedDevices.size() > 0) {
+                final String[] pairedDevicesStrings = new String[pairedDevices.size()];
+                int i = 0;
+                // There are paired devices. Get the name and address of each paired device.
+                for (BluetoothDevice device : pairedDevices) {
+                    pairedDevicesStrings[i++] = device.getName() + "\n" + device.getAddress();
+                    if (prefs.getString(Statics.PREFBTVARIODEVICE, "").equals(device.getAddress())) {
+                        bFoundBTVario = true;
+                        break;
+                    }
+                }
+                if (bFoundBTVario) {
+                    connectBTVarioDevice(true);
+                } else {
+                    if (debugMode) Log.d(TAG, "no known BT device, user need to choose one");
+                    final AlertDialog.Builder dialog = new AlertDialog.Builder(MainWearActivity.this)
+                            .setTitle(R.string.choose_bt_device)
+                            .setSingleChoiceItems(pairedDevicesStrings, -1, new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    if (debugMode) Log.d(TAG, "selected BT device: " + pairedDevicesStrings[which] + ", adress: " + pairedDevicesStrings[which].substring(pairedDevicesStrings[which].length() - 17));
+                                    prefs.edit().putString(Statics.PREFBTVARIODEVICE, pairedDevicesStrings[which].substring(pairedDevicesStrings[which].length() - 17)).apply();
+                                }
+                            })
+                            .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    connectBTVarioDevice(true);
+                                }
+                            })
+                            .setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    sendBTFailed(Statics.MY_BT_FAILED_USER);
+                                }
+                            });
+                    final AlertDialog alert = dialog.create();
+                    alert.show();
+                }
+            } else {
+                sendBTFailed(Statics.MY_BT_FAILED_NO_DEVICE);
+            }
+        } else {
+            if (debugMode) Log.d(TAG, "BT already connected");
+        }
+    }
+
+    private void disableBTConnection() {
+        if (debugMode) Log.d(TAG, "disabling BT connection");
+        // Cancel any thread currently running a connection
+        if (mBTConnectedThread != null) {
+            mBTConnectedThread.cancel();
+            mBTConnectedThread = null;
+
+            Toast.makeText(getApplicationContext(), R.string.bt_disconnect, Toast.LENGTH_LONG).show();
+        }
+        // Cancel any thread attempting to make a connection
+        if (mBTConnectThread != null) {
+            mBTConnectThread.cancel();
+            mBTConnectThread = null;
+        }
+    }
+
+    private void connectBTVarioDevice(boolean secure) {
+        // Get the BluetoothDevice object
+        BluetoothDevice device = null;
+        try {
+            device = mBluetoothAdapter.getRemoteDevice(prefs.getString(Statics.PREFBTVARIODEVICE, ""));
+        } catch (IllegalArgumentException e) {
+            if (debugMode) Log.d(TAG, "device address invalid");
+        }
+        if (device != null) {
+            // Cancel any thread currently running a connection
+            if (mBTConnectedThread != null) {
+                if (debugMode) Log.d(TAG, "cancel estabilished BT connection to make a new one");
+                mBTConnectedThread.cancel();
+                mBTConnectedThread = null;
+            }
+            // Cancel any thread attempting to make a connection
+            if (mBTConnectThread != null) {
+                if (debugMode) Log.d(TAG, "cancel pending BT connection to make a new one");
+                mBTConnectThread.cancel();
+                mBTConnectThread = null;
+            }
+            // Start the thread to connect with the given device
+            mBTConnectThread = new ConnectThread(device, secure);
+            mBTConnectThread.start();
+
+            Toast.makeText(getApplicationContext(), R.string.bt_connecting, Toast.LENGTH_LONG).show();
+        } else {
+            if (debugMode) Log.d(TAG, "selected BT device not found");
+            sendBTFailed(Statics.MY_BT_FAILED_NO_DEVICE);
+        }
+    }
+
+    private void connectedBT(BluetoothSocket socket, BluetoothDevice
+            device, final String socketType) {
+        if (debugMode) Log.d(TAG, "connected BT, Socket Type:" + socketType);
+        // Start the thread to manage the connection and perform transmissions
+        mBTConnectedThread = new ConnectedThread(socket, socketType);
+        mBTConnectedThread.start();
+
+        Toast.makeText(getApplicationContext(), R.string.bt_connected, Toast.LENGTH_LONG).show();
+    }
+
+    private void connectionBTFailed() {
+        if (debugMode) Log.d(TAG, "connection BT failed");
+        // reconnect after some delay
+        mHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (!activityStopping) connectBTVarioDevice(true);
+            }
+        }, 1000 * 5);
+        Toast.makeText(getApplicationContext(), R.string.bt_connection_failed, Toast.LENGTH_LONG).show();
+    }
+
+    private void connectionBTLost() {
+        if (debugMode) Log.d(TAG, "connection BT lost");
+        // reconnect after some delay
+        mHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (!activityStopping) connectBTVarioDevice(true);
+            }
+        }, 1000);
+        Toast.makeText(getApplicationContext(), R.string.bt_connection_lost, Toast.LENGTH_LONG).show();
+    }
+
+    private class ConnectThread extends Thread {
+        private final BluetoothSocket mmSocket;
+        private final BluetoothDevice mmDevice;
+        private String mSocketType;
+
+        public ConnectThread(BluetoothDevice device, boolean secure) {
+            // Use a temporary object that is later assigned to mmSocket
+            // because mmSocket is final.
+            BluetoothSocket tmp = null;
+            mmDevice = device;
+            mSocketType = secure ? "Secure" : "Insecure";
+
+            try {
+                if (secure) {
+                    tmp = device.createRfcommSocketToServiceRecord(
+                            MY_UUID_SECURE);
+                } else {
+                    tmp = device.createInsecureRfcommSocketToServiceRecord(
+                            MY_UUID_INSECURE);
+                }
+            } catch (IOException e) {
+                Log.e(TAG, "Socket's create() method failed", e);
+            }
+            mmSocket = tmp;
+        }
+
+        public void run() {
+            // Cancel discovery because it otherwise slows down the connection.
+            //mBluetoothAdapter.cancelDiscovery();
+
+            try {
+                // Connect to the remote device through the socket. This call blocks
+                // until it succeeds or throws an exception.
+                mmSocket.connect();
+            } catch (IOException connectException) {
+                // Unable to connect; close the socket and return.
+                try {
+                    mmSocket.close();
+                } catch (IOException closeException) {
+                    Log.e(TAG, "Could not close the client socket", closeException);
+                }
+                //if (debugMode) Log.e(TAG, "mmSocket connect failed: ", connectException);
+                new Handler(Looper.getMainLooper()).post(new Runnable () {
+                    @Override
+                    public void run () {
+                        connectionBTFailed();
+                    }
+                });
+                return;
+            }
+
+            // Start the connected thread
+            new Handler(Looper.getMainLooper()).post(new Runnable () {
+                @Override
+                public void run () {
+                    connectedBT(mmSocket, mmDevice, mSocketType);
+                }
+            });
+        }
+
+        // Closes the client socket and causes the thread to finish.
+        public void cancel() {
+            try {
+                mmSocket.close();
+            } catch (IOException e) {
+                Log.e(TAG, "Could not close the client socket", e);
+            }
+        }
+    }
+
+    private class ConnectedThread extends Thread {
+        private final BluetoothSocket mmSocket;
+        private final InputStream mmInStream;
+        private final OutputStream mmOutStream;
+        //private byte[] mmBuffer; // mmBuffer store for the stream
+        private final BufferedReader mmReader; // mmReader for raed whole line
+        private boolean bKeepAlive = true;
+
+        public ConnectedThread(BluetoothSocket socket, String socketType) {
+            if (debugMode) Log.d(TAG, "create ConnectedThread: " + socketType);
+            mmSocket = socket;
+            InputStream tmpIn = null;
+            OutputStream tmpOut = null;
+            BufferedReader tmpReader = null;
+
+            // Get the input and output streams; using temp objects because
+            // member streams are final.
+            try {
+                tmpIn = socket.getInputStream();
+                tmpReader = new BufferedReader(new InputStreamReader(tmpIn), 256);
+            } catch (IOException e) {
+                Log.e(TAG, "Error occurred when creating input stream", e);
+            }
+            try {
+                tmpOut = socket.getOutputStream();
+            } catch (IOException e) {
+                Log.e(TAG, "Error occurred when creating output stream", e);
+            }
+
+            mmInStream = tmpIn;
+            mmOutStream = tmpOut;
+            mmReader = tmpReader;
+        }
+
+        public void run() {
+            //mmBuffer = new byte[1024];
+            int numBytes; // bytes returned from read()
+            String line = null;
+
+            // Keep listening to the InputStream until an exception occurs.
+            while (bKeepAlive) {
+                try {
+                    line = mmReader.readLine();
+                    numBytes = line.length();
+                    Message readMsg = mHandler.obtainMessage(
+                            Statics.MY_BT_MESSAGE_READ, numBytes, -1,
+                            line);
+                    /*// Read from the InputStream.
+                    numBytes = mmInStream.read(mmBuffer);
+                    // Send the obtained bytes to the UI activity.
+                    Message readMsg = mHandler.obtainMessage(
+                            Statics.MY_BT_MESSAGE_READ, numBytes, -1,
+                            mmBuffer);*/
+                    readMsg.sendToTarget();
+                } catch (IOException e) {
+                    if (bKeepAlive) {
+                        Log.e(TAG, "Input stream was disconnected", e);
+                        new Handler(Looper.getMainLooper()).post(new Runnable() {
+                            @Override
+                            public void run() {
+                                connectionBTLost();
+                            }
+                        });
+                    }
+                    break;
+                }
+            }
+        }
+
+        // Call this from the main activity to send data to the remote device.
+        public void write(byte[] bytes) {
+            try {
+                mmOutStream.write(bytes);
+
+                // Share the sent message with the UI activity.
+                Message writtenMsg = mHandler.obtainMessage(
+                        Statics.MY_BT_MESSAGE_WRITE, -1, -1, bytes);
+                writtenMsg.sendToTarget();
+            } catch (IOException e) {
+                Log.e(TAG, "Error occurred when sending data", e);
+
+                // Send a failure message back to the activity.
+                /*Message writeErrorMsg =
+                        mHandler.obtainMessage(MessageConstants.MESSAGE_TOAST);
+                Bundle bundle = new Bundle();
+                bundle.putString("toast",
+                        "Couldn't send data to the other device");
+                writeErrorMsg.setData(bundle);
+                mHandler.sendMessage(writeErrorMsg);*/
+            }
+        }
+
+        // Call this method from the main activity to shut down the connection.
+        public void cancel() {
+            try {
+            	bKeepAlive = false;
+                mmSocket.close();
+            } catch (IOException e) {
+                Log.e(TAG, "Could not close the connect socket", e);
+            }
+        }
     }
 }

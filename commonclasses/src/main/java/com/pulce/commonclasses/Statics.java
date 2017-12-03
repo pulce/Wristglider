@@ -12,6 +12,17 @@ public class Statics {
     public static final int MY_PERMISSION_WRITE_STORAGE = 42;
     public static final int MY_PERMISSION_FINE_LOCATION = 43;
 
+    public static final int MY_REQUEST_ENABLE_BT = 1;
+
+    public static final int MY_BT_FAILED_NO_BT = 1;
+    public static final int MY_BT_FAILED_NO_DEVICE = 2;
+    public static final int MY_BT_FAILED_USER = 3;
+
+    public static final int MY_BT_MESSAGE_READ = 0;
+    public static final int MY_BT_MESSAGE_WRITE = 1;
+
+    public static final int MY_NULL_VALUE = -999999;
+
     private static final DecimalFormat latForm = new DecimalFormat("0000000");
     private static final DecimalFormat lonForm = new DecimalFormat("00000000");
 
@@ -19,6 +30,7 @@ public class Statics {
     public static final String DATAIGC = "/com/pulce/wristglider/dataigc";
     public static final String DATADELETE = "/com/pulce/wristglider/datadelete";
     public static final String DATATHROWABLE = "/com/pulce/wristglider/datathrowable";
+    public static final String DATABTFAILED = "/com/pulce/wristglider/databtfailed";
 
     public static final String PREFPILOTNAME = "/com/pulce/wristglider/prefpilotname";
     public static final String PREFGLIDERTYPE = "/com/pulce/wristglider/glidertype";
@@ -31,6 +43,9 @@ public class Statics {
     public static final String PREFSCREENON = "/com/pulce/wristglider/prefscreenon";
     public static final String PREFHEIGTHUNIT = "/com/pulce/wristglider/prefheightunit";
     public static final String PREFSPEEDUNIT = "/com/pulce/wristglider/prefspeedunit";
+    public static final String PREFUSEBTVARIO = "/com/pulce/wristglider/prefusebtvario";
+    public static final String PREFBTVARIOUNIT = "/com/pulce/wristglider/prefbtvariounit";
+    public static final String PREFBTVARIODEVICE = "/com/pulce/wristglider/prefbtvariodevice";
 
 
     public static String getUTCdateReverse() {

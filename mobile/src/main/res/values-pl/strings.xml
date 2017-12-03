@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Wristglider</string>
+    <string name="pilot_name">Pilot</string>
+    <string name="glider_type">Typ</string>
+    <string name="glider_id">ID</string>
+    <string name="permission_external_storage_hint">Uprawnienie zapisu do pamięci zewnętrznej jest wymagane by zapisać pliki .igc</string>
+    <string name="height_unit">Wysokość</string>
+    <string name="logger_autostart">Auto logowanie</string>
+    <string name="logger_seconds">Częst. logowania</string>
+    <string name="enable_ambient">Przyciemnianie</string>
+    <string name="rotate_view">Obrót ekranu</string>
+    <string name="speed_unit">Prędkość</string>
+    <string name="add_new_glider1">Dodaj</string>
+    <string name="add_new_glider2">paralotnię...</string>
+    <string name="glider_type_and_id">Typ i ID paralotni</string>
+    <string name="glider">Paralotnia</string>
+    <string name="delete">Usuń</string>
+    <string name="select">Wybierz</string>
+    <string name="enter_pilot">Nazwa pilota</string>
+    <string name="saved_log">Zapisuje log:</string>
+    <string name="use_bt_vario">Użyj vario BT</string>
+    <string name="bt_failed_no_bt">Twój zegarek nie obsługuje Bluetooth</string>
+    <string name="bt_failed_no_device">Brak urządzenia vario BT</string>
+    <string name="bt_failed_user">Połączenie Bluetooth anulowane przez użytkownika</string>
+    <string name="vario_unit">Wariometr</string>
+</resources>

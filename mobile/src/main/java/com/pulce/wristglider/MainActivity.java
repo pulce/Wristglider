@@ -77,6 +77,8 @@ public class MainActivity extends Activity implements
     private GoogleApiClient mGoogleApiClient;
     private TableLayout tablelayout;
 
+    private CheckBox checkBoxBT;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -97,22 +99,26 @@ public class MainActivity extends Activity implements
         addTableRow(getString(R.string.rotate_view), Statics.PREFROTATEDEGREES);
         addTableRow(getString(R.string.height_unit), Statics.PREFHEIGTHUNIT);
         addTableRow(getString(R.string.speed_unit), Statics.PREFSPEEDUNIT);
+        addTableRow(getString(R.string.use_bt_vario), Statics.PREFUSEBTVARIO);
+        addTableRow(getString(R.string.vario_unit), Statics.PREFBTVARIOUNIT);
 
         mGoogleApiClient = new GoogleApiClient.Builder(this)
                 .addConnectionCallbacks(this)
                 .addApi(Wearable.API).build();
-        mGoogleApiClient.connect();
     }
 
     @Override
     public void onResume() {
         super.onResume();
+        mGoogleApiClient.connect();
     }
 
 
     @Override
     public void onPause() {
         super.onPause();
+        Wearable.DataApi.removeListener(mGoogleApiClient, this);
+        mGoogleApiClient.disconnect();
     }
 
     @Override
@@ -134,6 +140,10 @@ public class MainActivity extends Activity implements
             if (event.getType() == DataEvent.TYPE_CHANGED &&
                     event.getDataItem().getUri().getPath().contains(Statics.DATATHROWABLE)) {
                 getExceptionFromWear(event.getDataItem());
+            }
+            if (event.getType() == DataEvent.TYPE_CHANGED &&
+                    event.getDataItem().getUri().getPath().contains(Statics.DATABTFAILED)) {
+                getBTFailed(event.getDataItem());
             }
         }
     }
@@ -189,6 +199,9 @@ public class MainActivity extends Activity implements
                         }
                         if (item.getUri().getPath().contains(Statics.DATATHROWABLE)) {
                             getExceptionFromWear(item);
+                        }
+                        if (item.getUri().getPath().contains(Statics.DATABTFAILED)) {
+                            getBTFailed(item);
                         }
                     }
                 }
@@ -301,6 +314,8 @@ public class MainActivity extends Activity implements
         dataMap.getDataMap().putString(Statics.PREFSPEEDUNIT, prefs.getString(Statics.PREFSPEEDUNIT, "km/h"));
         dataMap.getDataMap().putString(Statics.PREFHEIGTHUNIT, prefs.getString(Statics.PREFHEIGTHUNIT, "m"));
         dataMap.getDataMap().putString(Statics.PREFROTATEDEGREES, prefs.getString(Statics.PREFROTATEDEGREES, "0"));
+        dataMap.getDataMap().putBoolean(Statics.PREFUSEBTVARIO, prefs.getBoolean(Statics.PREFUSEBTVARIO, false));
+        dataMap.getDataMap().putString(Statics.PREFBTVARIOUNIT, prefs.getString(Statics.PREFBTVARIOUNIT, "m/s"));
         PutDataRequest request = dataMap.asPutDataRequest();
         request.setUrgent();
         Wearable.DataApi.putDataItem(mGoogleApiClient, request);
@@ -371,7 +386,7 @@ public class MainActivity extends Activity implements
                             layout.addView(gliderType);
                             layout.addView(gliderID);
                             builder.setView(layout);
-                            builder.setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
+                            builder.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
                                 public void onClick(DialogInterface dialog, int whichButton) {
                                     spinnerSilent = true;
                                     spinnerArray.add(0, gliderType.getText().toString() + "\n" + gliderID.getText().toString());
@@ -383,7 +398,7 @@ public class MainActivity extends Activity implements
                                     updatePreferences();
                                 }
                             });
-                            builder.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
+                            builder.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
                                 public void onClick(DialogInterface dialog, int whichButton) {
                                     spinnerSilent = true;
                                     spinner.setSelection(spinner.lastActivePosition);
@@ -450,6 +465,7 @@ public class MainActivity extends Activity implements
                 break;
             case Statics.PREFLOGGERAUTO:
             case Statics.PREFSCREENON:
+            case Statics.PREFUSEBTVARIO:
                 final CheckBox cp2 = new CheckBox(this);
                 cp2.setChecked(prefs.getBoolean(preferencekey, false));
                 cp2.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
@@ -460,9 +476,11 @@ public class MainActivity extends Activity implements
                     }
                 });
                 tr.addView(cp2);
+                if (preferencekey.equals(Statics.PREFUSEBTVARIO)) checkBoxBT = cp2;
                 break;
             case Statics.PREFHEIGTHUNIT:
             case Statics.PREFSPEEDUNIT:
+            case Statics.PREFBTVARIOUNIT:
             case Statics.PREFLOGGERSECONDS:
             case Statics.PREFROTATEDEGREES:
                 final Spinner spinner2 = new Spinner(this);
@@ -472,6 +490,7 @@ public class MainActivity extends Activity implements
                         spinner2Array.add("0");
                         spinner2Array.add("90");
                         spinner2Array.add("-90");
+                        spinner2Array.add("AUTO");
                         break;
                     case Statics.PREFHEIGTHUNIT:
                         spinner2Array.add("m");
@@ -480,6 +499,10 @@ public class MainActivity extends Activity implements
                     case Statics.PREFSPEEDUNIT:
                         spinner2Array.add("km/h");
                         spinner2Array.add("mph");
+                        spinner2Array.add("kn");
+                        break;
+                    case Statics.PREFBTVARIOUNIT:
+                        spinner2Array.add("m/s");
                         spinner2Array.add("kn");
                         break;
                     default:
@@ -540,7 +563,7 @@ public class MainActivity extends Activity implements
                         input.setText(prefs.getString(preferencekey, ""));
                         input.setInputType(InputType.TYPE_CLASS_TEXT);
                         builder.setView(input);
-                        builder.setPositiveButton(getString(R.string.ok), new DialogInterface.OnClickListener() {
+                        builder.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 tv2.setText(input.getText().toString());
@@ -551,7 +574,7 @@ public class MainActivity extends Activity implements
                                 if (debugMode) Log.d(TAG, "Updating Preferences");
                             }
                         });
-                        builder.setNegativeButton(getString(R.string.cancel), new DialogInterface.OnClickListener() {
+                        builder.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 dialog.cancel();
@@ -581,4 +604,25 @@ public class MainActivity extends Activity implements
         }
     }
 
+    private void getBTFailed(DataItem dataItem) {
+        dataItem.freeze();
+        final Uri dataItemUri = dataItem.getUri();
+        DataMapItem dataMapItem = DataMapItem.fromDataItem(dataItem);
+        final int reason = dataMapItem.getDataMap().getInt("reason");
+        if (debugMode) Log.d(TAG, "BT failed on wear, reason: " + reason);
+        switch (reason) {
+            case Statics.MY_BT_FAILED_NO_BT:
+                Toast.makeText(getApplicationContext(), R.string.bt_failed_no_bt, Toast.LENGTH_LONG).show();
+                break;
+            case Statics.MY_BT_FAILED_NO_DEVICE:
+                Toast.makeText(getApplicationContext(), R.string.bt_failed_no_device, Toast.LENGTH_LONG).show();
+                break;
+            case Statics.MY_BT_FAILED_USER:
+                Toast.makeText(getApplicationContext(), R.string.bt_failed_user, Toast.LENGTH_LONG).show();
+                break;
+        }
+        Wearable.DataApi.deleteDataItems(mGoogleApiClient, dataItemUri);
+        prefs.edit().putBoolean(Statics.PREFUSEBTVARIO, false).apply();
+        checkBoxBT.setChecked(false);
+    }
 }
