@@ -24,4 +24,5 @@
     <string name="bt_failed_no_device">Bluetooth Vario konnte nicht gefunden werden</string>
     <string name="bt_failed_user">Bluetooth Verbindung von Benutzer getrennt</string>
     <string name="vario_unit">Einheit Vario</string>
+    <string name="new_glider_fail_no_type">Fluggerät Typ muss angegeben werden</string>
 </resources>

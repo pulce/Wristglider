@@ -23,4 +23,5 @@
     <string name="bt_failed_no_device">Bluetooth Vario device not found</string>
     <string name="bt_failed_user">Bluetooth connection canceled by the user</string>
     <string name="vario_unit">Vario unit</string>
+    <string name="new_glider_fail_no_type">Glider type cannot be empty.</string>
 </resources>

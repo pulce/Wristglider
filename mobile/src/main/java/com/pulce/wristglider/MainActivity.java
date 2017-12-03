@@ -20,6 +20,7 @@ import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.EditText;
@@ -388,15 +389,7 @@ public class MainActivity extends Activity implements
                             builder.setView(layout);
                             builder.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
                                 public void onClick(DialogInterface dialog, int whichButton) {
-                                    spinnerSilent = true;
-                                    spinnerArray.add(0, gliderType.getText().toString() + "\n" + gliderID.getText().toString());
-                                    spinner.setSelection(0, false);
-                                    spinnerArrayAdapter.notifyDataSetChanged();
-                                    prefs.edit().putString(preferencekey, gliderArrayToString(spinnerArray)).apply();
-                                    prefs.edit().putString(Statics.PREFGLIDERTYPE, gliderType.getText().toString()).apply();
-                                    prefs.edit().putString(Statics.PREFGLIDERID, gliderID.getText().toString()).apply();
-                                    updatePreferences();
-                                }
+                                 }
                             });
                             builder.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
                                 public void onClick(DialogInterface dialog, int whichButton) {
@@ -411,14 +404,41 @@ public class MainActivity extends Activity implements
                                     spinner.setSelection(spinner.lastActivePosition);
                                 }
                             });
-                            builder.show();
+                            final AlertDialog ad = builder.show();
+                            Button okButton = ad.getButton(AlertDialog.BUTTON_POSITIVE);
+                            okButton.setOnClickListener(new View.OnClickListener() {
+                                @Override
+                                public void onClick(View view) {
+                                    if (gliderType.getText().toString().equals("")) {
+                                        Toast.makeText(MainActivity.this, R.string.new_glider_fail_no_type, Toast.LENGTH_SHORT).show();
+                                        return;
+                                    }
+                                    spinnerSilent = true;
+                                    spinnerArray.add(0, gliderType.getText().toString() + "\n" + gliderID.getText().toString());
+                                    spinner.setSelection(0, false);
+                                    spinnerArrayAdapter.notifyDataSetChanged();
+                                    prefs.edit().putString(preferencekey, gliderArrayToString(spinnerArray)).apply();
+                                    prefs.edit().putString(Statics.PREFGLIDERTYPE, gliderType.getText().toString()).apply();
+                                    prefs.edit().putString(Statics.PREFGLIDERID, gliderID.getText().toString()).apply();
+                                    updatePreferences();
+                                    ad.dismiss();
+                                }
+                            });
                         } else {
                             AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
                             builder.setTitle(R.string.glider_type_and_id);
                             final EditText gliderType = new EditText(MainActivity.this);
-                            gliderType.setText(spinner.getSelectedItem().toString().split("\n")[0]);
                             final EditText gliderID = new EditText(MainActivity.this);
-                            gliderID.setText(spinner.getSelectedItem().toString().split("\n")[1]);
+                            if (spinner.getSelectedItem().toString().length() > 2) {
+                                gliderType.setText(spinner.getSelectedItem().toString().split("\n")[0]);
+                            } else {
+                                gliderType.setHint(getString(R.string.glider_type));
+                            }
+                            if (spinner.getSelectedItem().toString().split("\n").length > 0) {
+                                gliderID.setText(spinner.getSelectedItem().toString().split("\n")[1]);
+                            } else {
+                                gliderID.setHint(getString(R.string.glider_id));
+                            }
                             LinearLayout layout = new LinearLayout(MainActivity.this);
                             layout.setOrientation(LinearLayout.VERTICAL);
                             layout.addView(gliderType);
