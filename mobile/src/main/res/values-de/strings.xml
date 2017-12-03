@@ -19,4 +19,9 @@
     <string name="select">Auswählen</string>
     <string name="enter_pilot">Pilot eingeben</string>
     <string name="saved_log">Speichere Log:</string>
+    <string name="use_bt_vario">BT Vario verwenden</string>
+    <string name="bt_failed_no_bt">Ihre Smartwatch kann Bluetooth nicht starten</string>
+    <string name="bt_failed_no_device">Bluetooth Vario konnte nicht gefunden werden</string>
+    <string name="bt_failed_user">Bluetooth Verbindung von Benutzer getrennt</string>
+    <string name="vario_unit">Einheit Vario</string>
 </resources>
