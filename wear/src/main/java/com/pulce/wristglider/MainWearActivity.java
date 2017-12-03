@@ -1,6 +1,7 @@
 package com.pulce.wristglider;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
@@ -370,6 +371,10 @@ public class MainWearActivity extends WearableActivity implements
         super.onPause();
         if (debugMode) Log.d(TAG, "pausing");
         Wearable.DataApi.removeListener(mGoogleApiClient, this);
+        if (mGoogleApiClient.isConnected()) {
+            LocationServices.FusedLocationApi
+                    .removeLocationUpdates(mGoogleApiClient, this);
+        }
         mGoogleApiClient.disconnect();
     }
 
@@ -378,6 +383,7 @@ public class MainWearActivity extends WearableActivity implements
         super.onResume();
         mGoogleApiClient.connect();
     }
+
 
     @Override
     public void onConnected(@Nullable Bundle bundle) {
@@ -433,7 +439,7 @@ public class MainWearActivity extends WearableActivity implements
         }
     }
 
-    private void switchView(View newView) {
+     private void switchView(View newView) {
         setContentView(newView);
 
         speedTextView = (TextView) newView.findViewById(R.id.speedtext);
