@@ -1138,6 +1138,8 @@ public class MainWearActivity extends WearableActivity implements
             mBTConnectedThread = null;
 
             Toast.makeText(getApplicationContext(), R.string.bt_disconnect, Toast.LENGTH_LONG).show();
+
+            mVarioData = new VarioData();
         }
         // Cancel any thread attempting to make a connection
         if (mBTConnectThread != null) {
@@ -1196,7 +1198,7 @@ public class MainWearActivity extends WearableActivity implements
             public void run() {
                 if (!activityStopping) connectBTVarioDevice(true);
             }
-        }, 1000 * 5);
+        }, 1000 * 10);
         Toast.makeText(getApplicationContext(), R.string.bt_connection_failed, Toast.LENGTH_LONG).show();
     }
 
@@ -1208,8 +1210,9 @@ public class MainWearActivity extends WearableActivity implements
             public void run() {
                 if (!activityStopping) connectBTVarioDevice(true);
             }
-        }, 1000);
+        }, 1000 * 5);
         Toast.makeText(getApplicationContext(), R.string.bt_connection_lost, Toast.LENGTH_LONG).show();
+        mVarioData = new VarioData();
     }
 
     private class ConnectThread extends Thread {
