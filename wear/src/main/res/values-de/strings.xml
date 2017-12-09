@@ -6,4 +6,10 @@
     <string name="stop_logger_confirm">Möchtest Du den Logger stoppen?</string>
     <string name="stop_logger">Logger Stoppen</string>
     <string name="logger_started">Flug gestartet</string>
+    <string name="choose_bt_device">Wähle BT Vario</string>
+    <string name="bt_disconnect">Bluetooth Verbindung getrennt</string>
+    <string name="bt_connecting">Bluetooth verbinde...</string>
+    <string name="bt_connected">Bluetooth verbunden</string>
+    <string name="bt_connection_failed">Bluetooth Verbindung fehlgeschlagen</string>
+    <string name="bt_connection_lost">Bluetooth Verbindung verloren</string>
 </resources>
