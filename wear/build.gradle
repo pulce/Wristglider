@@ -22,15 +22,18 @@ android {
             buildConfigField "boolean", "LOG_ENABLED", "true"
         }
     }
+    flavorDimensions "free"
     productFlavors {
         wear1 {
             // Use the defaultConfig value
+            dimension "free"
         }
         wear2 {
             minSdkVersion 25
+            dimension "free"
         }
     }
-    buildToolsVersion '25.0.2'
+    buildToolsVersion '26.0.2'
 }
 
 dependencies {

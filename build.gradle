@@ -3,9 +3,13 @@
 buildscript {
     repositories {
         jcenter()
+        maven {
+            url 'https://maven.google.com/'
+            name 'Google'
+        }
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:2.3.1'
+        classpath 'com.android.tools.build:gradle:3.0.1'
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files
         classpath 'com.google.gms:google-services:3.0.0'
@@ -15,6 +19,7 @@ buildscript {
 allprojects {
     repositories {
         jcenter()
+        google()
     }
     project.ext {
         myApplicationID="com.pulce.wristglider"
@@ -23,7 +28,7 @@ allprojects {
         myMinSdkVersion=20
         myTargetSdkVersion=25
         myCompileSdkVersion=25
-        myBuildToolsVersion="25.0.2"
+        myBuildToolsVersion="26.0.2"
     }
 }
 
