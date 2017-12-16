@@ -11,6 +11,7 @@ android {
         versionName project.ext.myVersionNumber
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
         multiDexEnabled true
+        wearAppUnbundled true
     }
     buildTypes {
         release {
@@ -30,10 +31,9 @@ dependencies {
     androidTestCompile('com.android.support.test.espresso:espresso-core:2.2.2', {
         exclude group: 'com.android.support', module: 'support-annotations'
     })
-    wearApp project(path: ':wear', configuration: 'wear1Release')
     compile project(':commonclasses')
-    compile 'com.google.android.gms:play-services:9.8.0'
-    compile 'com.google.firebase:firebase-crash:9.8.0'
+    compile 'com.google.android.gms:play-services:11.6.2'
+    compile 'com.google.firebase:firebase-crash:11.6.2'
     testCompile 'junit:junit:4.12'
 }
 
