@@ -1071,6 +1071,7 @@ public class MainWearActivity extends WearableActivity implements
         if (debugMode) Log.d(TAG, "disabling Use BT Vario option and sending to mobile, reason: " + reason);
         prefs.edit().putString(Statics.PREFBTVARIODEVICE, "").apply();
         prefs.edit().putBoolean(Statics.PREFUSEBTVARIO, false).apply();
+        switchView(stdView);
         PutDataMapRequest dataMap = PutDataMapRequest.create(Statics.DATABTFAILED);
         dataMap.getDataMap().putInt("reason", reason);
         PutDataRequest request = dataMap.asPutDataRequest();
