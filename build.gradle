@@ -23,9 +23,10 @@ allprojects {
     }
     project.ext {
         myApplicationID="com.pulce.wristglider"
-        myVersionCode=12
-        myVersionNumber="0.4.0"
-        myMinSdkVersion=23
+        myVersionCode=15
+        myVersionNumber="0.4.3"
+        myMinSdkVersion=20
+        myWearMinSdkVersion=23
         myTargetSdkVersion=25
         myCompileSdkVersion=25
         myBuildToolsVersion="26.0.2"

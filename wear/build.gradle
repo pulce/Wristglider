@@ -7,7 +7,7 @@ android {
 
     defaultConfig {
         applicationId project.ext.myApplicationID
-        minSdkVersion project.ext.myMinSdkVersion
+        minSdkVersion project.ext.myWearMinSdkVersion
         targetSdkVersion project.ext.myTargetSdkVersion
         versionCode project.ext.myVersionCode
         versionName project.ext.myVersionNumber

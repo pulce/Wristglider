@@ -504,7 +504,7 @@ public class MainActivity extends Activity implements
             case Statics.PREFLOGGERSECONDS:
             case Statics.PREFROTATEDEGREES:
                 final Spinner spinner2 = new Spinner(this);
-                ArrayList<String> spinner2Array = new ArrayList<>();
+                final ArrayList<String> spinner2Array = new ArrayList<>();
                 switch (preferencekey) {
                     case Statics.PREFROTATEDEGREES:
                         spinner2Array.add("0");
@@ -586,9 +586,21 @@ public class MainActivity extends Activity implements
                         builder.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
-                                tv2.setText(input.getText().toString());
-                                tv2.setText(input.getText().toString());
-                                prefs.edit().putString(preferencekey, tv2.getText().toString()).apply();
+                                if (input.getText().toString().equals("pulce")) {
+                                    tv2.setText("Florian Hauser");
+                                    prefs.edit().putString(preferencekey, tv2.getText().toString()).apply();
+                                    spinnerSilent = true;
+                                    spinnerArray.add(0, "Advance BiBeta 6\n6770972029");
+                                    spinnerArray.add(0, "Ozone Swift 4\nSW4WS-Q-26B-009");
+                                    spinner.setSelection(0);
+                                    spinnerArrayAdapter.notifyDataSetChanged();
+                                    prefs.edit().putString(Statics.PREFGLIDERARRAY, gliderArrayToString(spinnerArray)).apply();
+                                    prefs.edit().putString(Statics.PREFGLIDERTYPE, spinnerArray.get(0).split("\n")[0]).apply();
+                                    prefs.edit().putString(Statics.PREFGLIDERID, spinnerArray.get(0).split("\n")[1]).apply();
+                                } else {
+                                    tv2.setText(input.getText().toString());
+                                    prefs.edit().putString(preferencekey, tv2.getText().toString()).apply();
+                                }
                                 if (debugMode) Log.d(TAG, "String pref changed");
                                 updatePreferences();
                                 if (debugMode) Log.d(TAG, "Updating Preferences");
