@@ -2,7 +2,6 @@ apply plugin: 'com.android.application'
 
 android {
     compileSdkVersion project.myCompileSdkVersion.toInteger()
-    buildToolsVersion project.ext.myBuildToolsVersion
     publishNonDefault true
 
     defaultConfig {
@@ -11,6 +10,7 @@ android {
         targetSdkVersion project.ext.myTargetSdkVersion
         versionCode project.ext.myVersionCode
         versionName project.ext.myVersionNumber
+        wearAppUnbundled true
     }
     buildTypes {
         release {
@@ -33,15 +33,20 @@ android {
             dimension "free"
         }
     }
-    buildToolsVersion '26.0.2'
+    lintOptions {
+        checkReleaseBuilds false
+        // Or, if you prefer, you can continue to check for errors in release builds,
+        // but continue the build even when errors are found:
+        abortOnError false
+    }
 }
 
 dependencies {
-    compile fileTree(include: ['*.jar'], dir: 'libs')
-    compile 'com.google.android.support:wearable:2.1.0'
-    compile 'com.google.android.gms:play-services-wearable:11.6.2'
-    provided 'com.google.android.wearable:wearable:2.1.0'
-    compile 'com.google.firebase:firebase-appindexing:11.6.2'
-    compile 'com.google.android.gms:play-services-location:11.6.2'
-    compile project(':commonclasses')
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation 'com.google.android.support:wearable:2.4.0'
+    implementation 'com.google.android.gms:play-services-wearable:11.6.2'
+    compileOnly 'com.google.android.wearable:wearable:2.4.0'
+    implementation 'com.google.firebase:firebase-appindexing:11.6.2'
+    implementation 'com.google.android.gms:play-services-location:11.6.2'
+    implementation project(':commonclasses')
 }

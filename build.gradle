@@ -7,12 +7,13 @@ buildscript {
             url 'https://maven.google.com/'
             name 'Google'
         }
+        google()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.0.1'
+        classpath 'com.android.tools.build:gradle:3.4.1'
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files
-        classpath 'com.google.gms:google-services:3.0.0'
+        classpath 'com.google.gms:google-services:4.2.0'
     }
 }
 
@@ -23,13 +24,12 @@ allprojects {
     }
     project.ext {
         myApplicationID="com.pulce.wristglider"
-        myVersionCode=15
-        myVersionNumber="0.4.3"
-        myMinSdkVersion=20
+        myVersionCode=21
+        myVersionNumber="0.4.5"
+        myMinSdkVersion=21
         myWearMinSdkVersion=23
-        myTargetSdkVersion=25
-        myCompileSdkVersion=25
-        myBuildToolsVersion="26.0.2"
+        myTargetSdkVersion=28
+        myCompileSdkVersion=28
     }
 }
 

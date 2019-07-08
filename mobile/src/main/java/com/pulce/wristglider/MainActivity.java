@@ -591,7 +591,7 @@ public class MainActivity extends Activity implements
                                     prefs.edit().putString(preferencekey, tv2.getText().toString()).apply();
                                     spinnerSilent = true;
                                     spinnerArray.add(0, "Advance BiBeta 6\n6770972029");
-                                    spinnerArray.add(0, "Ozone Swift 4\nSW4WS-Q-26B-009");
+                                    spinnerArray.add(0, "Ozone Alpina 3\nAA3MS-S-50B-108");
                                     spinner.setSelection(0);
                                     spinnerArrayAdapter.notifyDataSetChanged();
                                     prefs.edit().putString(Statics.PREFGLIDERARRAY, gliderArrayToString(spinnerArray)).apply();

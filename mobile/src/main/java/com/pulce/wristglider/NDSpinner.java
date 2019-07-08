@@ -4,7 +4,7 @@ import android.content.Context;
 import android.util.AttributeSet;
 import android.widget.Spinner;
 
-public class NDSpinner extends Spinner {
+public class NDSpinner extends android.support.v7.widget.AppCompatSpinner {
 
     public int lastActivePosition;
 

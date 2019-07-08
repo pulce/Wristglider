@@ -107,7 +107,7 @@ public class MainWearActivity extends WearableActivity implements
     private TextView loggerState;
     //private TextView batteryState;
     private ProgressBar progressBar;
-    private SwipeDismissFrameLayout coreLayout;
+    //private SwipeDismissFrameLayout coreLayout;
     private TextView varioTextView;
     private TextView varioMinusTextView;
     private View[] varioBarPos = new View[10];
@@ -449,9 +449,11 @@ public class MainWearActivity extends WearableActivity implements
         loggerState = (TextView) newView.findViewById(R.id.loggerstate);
         //batteryState = (TextView) newView.findViewById(R.id.batterystate);
         progressBar = (ProgressBar) newView.findViewById(R.id.progress);
-        coreLayout = (SwipeDismissFrameLayout) newView.findViewById(R.id.container);
+        //coreLayout = (SwipeDismissFrameLayout) newView.findViewById(R.id.altitext);
         // overriding OnTouchListener on SwipeDismissFrameLayout will also disable SwipeToDismiss - double win for us ;)
-        coreLayout.setOnTouchListener(new View.OnTouchListener() {
+        //coreLayout.setOnTouchListener(new View.OnTouchListener() {
+         //Set onTouchListener for altitude
+         altTextView.setOnTouchListener(new View.OnTouchListener() {
             Handler handler = new Handler();
 
             int numberOfTaps = 0;
@@ -463,52 +465,6 @@ public class MainWearActivity extends WearableActivity implements
                 switch (event.getAction()) {
                     case MotionEvent.ACTION_DOWN:
                         touchDownMs = System.currentTimeMillis();
-                        // long press
-                        handler.postDelayed(new Runnable() {
-                            @Override
-                            public void run() {
-                                if (loggerRunning) {
-                                    final AlertDialog.Builder dialog = new AlertDialog.Builder(MainWearActivity.this)
-                                            .setTitle(R.string.stop_logger)
-                                            .setMessage(R.string.stop_logger_confirm)
-                                            .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
-                                                @Override
-                                                public void onClick(DialogInterface dialog, int which) {
-                                                    stopLogger();
-                                                }
-                                            })
-                                            .setNegativeButton(android.R.string.no, new DialogInterface.OnClickListener() {
-                                                @Override
-                                                public void onClick(DialogInterface dialog, int which) {
-                                                }
-                                            })
-                                            .setIcon(android.R.drawable.ic_dialog_alert);
-                                    final AlertDialog alert = dialog.create();
-                                    alert.show();
-                                    final Handler handler = new Handler();
-                                    final Runnable runnable = new Runnable() {
-                                        @Override
-                                        public void run() {
-                                            if (alert.isShowing()) {
-                                                alert.dismiss();
-                                            }
-                                        }
-                                    };
-                                    alert.setOnDismissListener(new DialogInterface.OnDismissListener() {
-                                        @Override
-                                        public void onDismiss(DialogInterface dialog) {
-                                            handler.removeCallbacks(runnable);
-                                        }
-                                    });
-                                    handler.postDelayed(runnable, 3000);
-                                } else {
-                                    startLogger();
-                                }
-                                Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-                                v.vibrate(100);
-                            }
-                        }, ViewConfiguration.getLongPressTimeout());
-
                         break;
                     case MotionEvent.ACTION_UP:
                         handler.removeCallbacksAndMessages(null);
@@ -564,7 +520,92 @@ public class MainWearActivity extends WearableActivity implements
 
                 return true;
             }
+
         });
+         // Set onTouchListener for Logger
+         alternatives.setOnTouchListener(new View.OnTouchListener() {
+             Handler handler = new Handler();
+
+             int numberOfTaps = 0;
+             long lastTapTimeMs = 0;
+             long touchDownMs = 0;
+
+             @Override
+             public boolean onTouch(View v, MotionEvent event) {
+                 switch (event.getAction()) {
+                     case MotionEvent.ACTION_DOWN:
+                         touchDownMs = System.currentTimeMillis();
+                         break;
+                     case MotionEvent.ACTION_UP:
+                         handler.removeCallbacksAndMessages(null);
+
+                         if ((System.currentTimeMillis() - touchDownMs) > ViewConfiguration.getTapTimeout()) {
+                             //it was not a tap
+                             numberOfTaps = 0;
+                             lastTapTimeMs = 0;
+                             break;
+                         }
+
+                         if (numberOfTaps > 0
+                                 && (System.currentTimeMillis() - lastTapTimeMs) < ViewConfiguration.getDoubleTapTimeout()) {
+                             numberOfTaps += 1;
+                         } else {
+                             numberOfTaps = 1;
+                         }
+
+                         lastTapTimeMs = System.currentTimeMillis();
+
+                         if (numberOfTaps == 2) {
+                             handler.postDelayed(new Runnable() {
+                                 @Override
+                                 public void run() {
+                                     //handle double tap
+                                     if (loggerRunning) {
+                                         final AlertDialog.Builder dialog = new AlertDialog.Builder(MainWearActivity.this)
+                                                 .setTitle(R.string.stop_logger)
+                                                 .setMessage(R.string.stop_logger_confirm)
+                                                 .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
+                                                     @Override
+                                                     public void onClick(DialogInterface dialog, int which) {
+                                                         stopLogger();
+                                                     }
+                                                 })
+                                                 .setNegativeButton(android.R.string.no, new DialogInterface.OnClickListener() {
+                                                     @Override
+                                                     public void onClick(DialogInterface dialog, int which) {
+                                                     }
+                                                 })
+                                                 .setIcon(android.R.drawable.ic_dialog_alert);
+                                         final AlertDialog alert = dialog.create();
+                                         alert.show();
+                                         final Handler handler = new Handler();
+                                         final Runnable runnable = new Runnable() {
+                                             @Override
+                                             public void run() {
+                                                 if (alert.isShowing()) {
+                                                     alert.dismiss();
+                                                 }
+                                             }
+                                         };
+                                         alert.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                                             @Override
+                                             public void onDismiss(DialogInterface dialog) {
+                                                 handler.removeCallbacks(runnable);
+                                             }
+                                         });
+                                         handler.postDelayed(runnable, 3000);
+                                     } else {
+                                         startLogger();
+                                     }
+                                 }
+                             }, ViewConfiguration.getDoubleTapTimeout());
+                         }
+                 }
+
+                 return true;
+             }
+
+         });
     }
 
     private void deleteSingleIgcFile(DataItem item) {
