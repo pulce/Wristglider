@@ -320,32 +320,41 @@
                 android:layout_height="0dp"
                 android:layout_weight="1">
 
-                <ImageView
-                    android:id="@+id/directionImage"
-                    android:layout_width="50dp"
-                    android:layout_height="50dp"
+                <RelativeLayout
+                    android:layout_width="58dp"
+                    android:layout_height="58dp"
                     android:layout_alignParentStart="true"
                     android:layout_alignParentTop="true"
                     android:layout_marginStart="5dp"
                     android:layout_marginTop="5dp"
-                    android:layout_centerVertical="true"
-                    android:background="@color/black"
-                    />
+                    android:layout_centerVertical="true">
 
-                <ProgressBar
-                    android:id="@+id/progress"
-                    style="?android:attr/progressBarStyleSmall"
-                    android:layout_width="50dp"
-                    android:layout_height="50dp"
-                    android:layout_alignParentStart="true"
-                    android:layout_alignParentTop="true"
-                    android:layout_marginStart="5dp"
-                    android:layout_marginTop="5dp"
-                    android:layout_centerVertical="true"
-                    android:indeterminate="true"
-                    android:indeterminateTintMode="src_atop"
-                    android:indeterminateTint="@color/white"
-                    android:visibility="visible"/>
+                    <ImageView
+                        android:id="@+id/directionImage"
+                        android:layout_width="50dp"
+                        android:layout_height="50dp"
+                        android:layout_centerInParent="true"
+                        android:background="#00000000" />
+
+                    <ImageView
+                        android:id="@+id/directionStartImage"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_centerInParent="true"
+                        android:background="#00000000" />
+
+                    <ProgressBar
+                        android:id="@+id/progress"
+                        style="?android:attr/progressBarStyleSmall"
+                        android:layout_width="50dp"
+                        android:layout_height="50dp"
+                        android:layout_centerInParent="true"
+                        android:indeterminate="true"
+                        android:indeterminateTintMode="src_atop"
+                        android:indeterminateTint="@color/white"
+                        android:visibility="visible"/>
+
+                </RelativeLayout>
 
                 <TextView
                     android:id="@+id/speedtext"
