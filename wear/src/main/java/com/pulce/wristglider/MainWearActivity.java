@@ -108,7 +108,7 @@ public class MainWearActivity extends WearableActivity implements
     private TextView loggerState;
     //private TextView batteryState;
     private ProgressBar progressBar;
-    //private SwipeDismissFrameLayout coreLayout;
+    private SwipeDismissFrameLayout coreLayout;
     private TextView varioTextView;
     private TextView varioMinusTextView;
     private View[] varioBarPos = new View[10];
@@ -456,9 +456,9 @@ public class MainWearActivity extends WearableActivity implements
          loggerState = (TextView) newView.findViewById(R.id.loggerstate);
          //batteryState = (TextView) newView.findViewById(R.id.batterystate);
          progressBar = (ProgressBar) newView.findViewById(R.id.progress);
-         //coreLayout = (SwipeDismissFrameLayout) newView.findViewById(R.id.container);
-         // overriding OnTouchListener on SwipeDismissFrameLayout will also disable SwipeToDismiss - double win for us ;)
-         //coreLayout.setOnTouchListener(new View.OnTouchListener() {
+         coreLayout = (SwipeDismissFrameLayout) newView.findViewById(R.id.container);
+         coreLayout.setDismissEnabled(false);
+
          //Set onTouchListener for altitude
          altTextView.setOnTouchListener(new View.OnTouchListener() {
             Handler handler = new Handler();
