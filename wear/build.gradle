@@ -2,7 +2,6 @@ apply plugin: 'com.android.application'
 
 android {
     compileSdkVersion project.myCompileSdkVersion.toInteger()
-    publishNonDefault true
 
     defaultConfig {
         applicationId project.ext.myApplicationID

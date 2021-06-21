@@ -20,6 +20,10 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.graphics.drawable.BitmapDrawable;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.location.Location;
 import android.os.AsyncTask;
 import android.os.Build;
@@ -87,6 +91,7 @@ import java.util.UUID;
 public class MainWearActivity extends WearableActivity implements
         GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener,
+        SensorEventListener,
         LocationListener,
         DataApi.DataListener,
         Thread.UncaughtExceptionHandler {
@@ -96,8 +101,8 @@ public class MainWearActivity extends WearableActivity implements
     private static SimpleDateFormat clockFormat;
 
     private static SharedPreferences prefs;
-    private static boolean debugMode = false;
 
+    private static boolean debugMode = true;
     private static boolean mockup = false;
 
     private TextView speedTextView;
@@ -123,6 +128,8 @@ public class MainWearActivity extends WearableActivity implements
     private String recentIgcFileName;
 
     private GoogleApiClient mGoogleApiClient;
+    private SensorManager sensorManager;
+    private Sensor pressure;
 
     private Thread.UncaughtExceptionHandler mDefaultUncaughtExceptionHandler;
 
@@ -297,6 +304,16 @@ public class MainWearActivity extends WearableActivity implements
         };*/
         this.registerReceiver(this.mBatInfoReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
 
+        sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        if (sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE) != null) {
+            // Success! There's a barometer.
+            if (debugMode) Log.d(TAG, "There's a barometer");
+            pressure = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE);
+        } else {
+            // Failure! No barometer.
+            if (debugMode) Log.d(TAG, "No barometer");
+        }
+
         if (mockup) {
             progressBar.setVisibility(View.INVISIBLE);
             speedTextView.setText("36.5");
@@ -322,7 +339,6 @@ public class MainWearActivity extends WearableActivity implements
 
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
     }
-
 
     @Override
     public void onStart() {
@@ -354,6 +370,8 @@ public class MainWearActivity extends WearableActivity implements
             } else {
                 setupBTConnection();
             }
+        } else {
+            registerPressureSensor();
         }
     }
 
@@ -363,6 +381,7 @@ public class MainWearActivity extends WearableActivity implements
         if (debugMode) Log.d(TAG, "stopping");
         activityStopping = true;
         Wearable.DataApi.removeListener(mGoogleApiClient, this);
+        unregisterPressureSensor();
         if (mGoogleApiClient.isConnected()) {
             LocationServices.FusedLocationApi
                     .removeLocationUpdates(mGoogleApiClient, this);
@@ -377,6 +396,7 @@ public class MainWearActivity extends WearableActivity implements
         super.onPause();
         if (debugMode) Log.d(TAG, "pausing");
         Wearable.DataApi.removeListener(mGoogleApiClient, this);
+        unregisterPressureSensor();
         if (mGoogleApiClient.isConnected()) {
             LocationServices.FusedLocationApi
                     .removeLocationUpdates(mGoogleApiClient, this);
@@ -387,9 +407,12 @@ public class MainWearActivity extends WearableActivity implements
     @Override
     public void onResume() {
         super.onResume();
+        if (debugMode) Log.d(TAG, "resuming");
         mGoogleApiClient.connect();
+        if (!prefs.getBoolean(Statics.PREFUSEBTVARIO, false)) {
+            registerPressureSensor();
+        }
     }
-
 
     @Override
     public void onConnected(@Nullable Bundle bundle) {
@@ -653,7 +676,7 @@ public class MainWearActivity extends WearableActivity implements
         prefs.edit().putBoolean(Statics.PREFSCREENON, dataMapItem.getDataMap().getBoolean(Statics.PREFSCREENON)).apply();
         prefs.edit().putString(Statics.PREFSPEEDUNIT, dataMapItem.getDataMap().getString(Statics.PREFSPEEDUNIT)).apply();
         prefs.edit().putString(Statics.PREFHEIGTHUNIT, dataMapItem.getDataMap().getString(Statics.PREFHEIGTHUNIT)).apply();
-        prefs.edit().putString(Statics.PREFBTVARIOUNIT, dataMapItem.getDataMap().getString(Statics.PREFBTVARIOUNIT)).apply();
+        prefs.edit().putString(Statics.PREFVARIOUNIT, dataMapItem.getDataMap().getString(Statics.PREFVARIOUNIT)).apply();
         if (!prefs.getString(Statics.PREFROTATEDEGREES, "0").equals(dataMapItem.getDataMap().getString(Statics.PREFROTATEDEGREES, "0"))) {
             if (dataMapItem.getDataMap().getString(Statics.PREFROTATEDEGREES, "0").equals("-90")) {
                 setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE);
@@ -678,10 +701,12 @@ public class MainWearActivity extends WearableActivity implements
                     } else {
                         setupBTConnection();
                     }
+                    unregisterPressureSensor();
                 } else {
                     switchView(stdView);
                     prefs.edit().putString(Statics.PREFBTVARIODEVICE, "").apply();
                     disableBTConnection();
+                    registerPressureSensor();
                 }
                 prefs.edit().putBoolean(Statics.PREFUSEBTVARIO, dataMapItem.getDataMap().getBoolean(Statics.PREFUSEBTVARIO)).apply();
             } else {
@@ -690,6 +715,40 @@ public class MainWearActivity extends WearableActivity implements
         }
         setMultipliers();
         if (debugMode) Log.d(TAG, "Preferences updated");
+    }
+
+    @Override
+    public final void onAccuracyChanged(Sensor sensor, int accuracy) {
+        // Do something here if sensor accuracy changes.
+        if (debugMode) Log.d(TAG, String.format("Pressure accuracy changed: %d", accuracy));
+    }
+
+    @Override
+    public final void onSensorChanged(SensorEvent event) {
+        float millibarsOfPressure = event.values[0];
+        if (debugMode) Log.d(TAG, String.format("Pressure changed: %.2f", millibarsOfPressure));
+
+        mVarioData.pressure = millibarsOfPressure;
+        mVarioData.baroAlt = Math.round(SensorManager.getAltitude(SensorManager.PRESSURE_STANDARD_ATMOSPHERE, millibarsOfPressure));
+
+        if (displaySecAlt) {
+            int displayAlt;
+            // bario alt used only for secondary altitude, because we dont configure QNH for altitude AGL
+            displayAlt = mVarioData.baroAlt - secAltTare;
+            altTextView.setText(String.format("%.0f", displayAlt * heightmultiplier));
+        }
+    }
+
+    private void registerPressureSensor() {
+        if (pressure != null) {
+            sensorManager.registerListener(this, pressure, SensorManager.SENSOR_DELAY_NORMAL);
+        }
+    }
+
+    private void unregisterPressureSensor() {
+        if (pressure != null) {
+            sensorManager.unregisterListener(this);
+        }
     }
 
     @Override
@@ -954,7 +1013,7 @@ public class MainWearActivity extends WearableActivity implements
         } else {
             heightmultiplier = 3.28084f;
         }
-        if (prefs.getString(Statics.PREFBTVARIOUNIT, "m/s").equals("kn")) {
+        if (prefs.getString(Statics.PREFVARIOUNIT, "m/s").equals("kn")) {
             variomultiplier = 1.943844f;
         } else {
             variomultiplier = 1f;
@@ -1136,6 +1195,7 @@ public class MainWearActivity extends WearableActivity implements
         PutDataRequest request = dataMap.asPutDataRequest();
         request.setUrgent();
         Wearable.DataApi.putDataItem(mGoogleApiClient, request);
+        registerPressureSensor();
     }
 
     private void setupBTConnection() {
