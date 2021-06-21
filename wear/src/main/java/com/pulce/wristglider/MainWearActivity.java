@@ -104,16 +104,18 @@ public class MainWearActivity extends WearableActivity implements
     private TextView altTextView;
     private TextView alternatives;
     private ImageView directionView;
+    private ImageView directionStartView;
     private TextView loggerState;
     //private TextView batteryState;
     private ProgressBar progressBar;
-    //private SwipeDismissFrameLayout coreLayout;
+    private SwipeDismissFrameLayout coreLayout;
     private TextView varioTextView;
     private TextView varioMinusTextView;
     private View[] varioBarPos = new View[10];
     private View[] varioBarNeg = new View[10];
 
     private Bitmap arrowBitmap;
+    private Bitmap arrowStartBitmap;
     private Matrix rotateMatrix = new Matrix();
 
     private PrintWriter pw;
@@ -125,7 +127,8 @@ public class MainWearActivity extends WearableActivity implements
     private Thread.UncaughtExceptionHandler mDefaultUncaughtExceptionHandler;
 
     private LinkedList<Location> pointStack;
-    private Location lastLoggedLocation;
+    private Location lastLoggedLocation = null;
+    private Location startLocation = null;
     private long startTimeOfFlight = 0;
     private int killFirstDirtylocations = 0;
 
@@ -273,6 +276,8 @@ public class MainWearActivity extends WearableActivity implements
 
         arrowBitmap = BitmapFactory.decodeResource(this.getResources(),
                 R.drawable.direction);
+        arrowStartBitmap = BitmapFactory.decodeResource(this.getResources(),
+                R.drawable.direction_start);
 
         pointStack = new LinkedList<>();
 
@@ -296,7 +301,8 @@ public class MainWearActivity extends WearableActivity implements
             progressBar.setVisibility(View.INVISIBLE);
             speedTextView.setText("36.5");
             altTextView.setText("3585");
-            directionView.setImageDrawable(getRotatedDir(30));
+            directionView.setImageDrawable(getRotatedDir(30, arrowBitmap));
+            directionStartView.setImageDrawable(getRotatedDir(300, arrowStartBitmap));
             mVarioData.vario = -1.2f;
             updateVario();
         }
@@ -440,18 +446,19 @@ public class MainWearActivity extends WearableActivity implements
     }
 
      private void switchView(View newView) {
-        setContentView(newView);
+         setContentView(newView);
 
-        speedTextView = (TextView) newView.findViewById(R.id.speedtext);
-        altTextView = (TextView) newView.findViewById(R.id.altitext);
-        directionView = (ImageView) newView.findViewById(R.id.directionImage);
-        alternatives = (TextView) newView.findViewById(R.id.otherfeed);
-        loggerState = (TextView) newView.findViewById(R.id.loggerstate);
-        //batteryState = (TextView) newView.findViewById(R.id.batterystate);
-        progressBar = (ProgressBar) newView.findViewById(R.id.progress);
-        //coreLayout = (SwipeDismissFrameLayout) newView.findViewById(R.id.altitext);
-        // overriding OnTouchListener on SwipeDismissFrameLayout will also disable SwipeToDismiss - double win for us ;)
-        //coreLayout.setOnTouchListener(new View.OnTouchListener() {
+         speedTextView = (TextView) newView.findViewById(R.id.speedtext);
+         altTextView = (TextView) newView.findViewById(R.id.altitext);
+         directionView = (ImageView) newView.findViewById(R.id.directionImage);
+         directionStartView = (ImageView) newView.findViewById(R.id.directionStartImage);
+         alternatives = (TextView) newView.findViewById(R.id.otherfeed);
+         loggerState = (TextView) newView.findViewById(R.id.loggerstate);
+         //batteryState = (TextView) newView.findViewById(R.id.batterystate);
+         progressBar = (ProgressBar) newView.findViewById(R.id.progress);
+         coreLayout = (SwipeDismissFrameLayout) newView.findViewById(R.id.container);
+         coreLayout.setDismissEnabled(false);
+
          //Set onTouchListener for altitude
          altTextView.setOnTouchListener(new View.OnTouchListener() {
             Handler handler = new Handler();
@@ -521,7 +528,7 @@ public class MainWearActivity extends WearableActivity implements
                 return true;
             }
 
-        });
+         });
          // Set onTouchListener for Logger
          alternatives.setOnTouchListener(new View.OnTouchListener() {
              Handler handler = new Handler();
@@ -701,7 +708,10 @@ public class MainWearActivity extends WearableActivity implements
             // Bearing
             progressBar.setVisibility(View.INVISIBLE);
             if (location.hasBearing()) {
-                directionView.setImageDrawable(getRotatedDir(location.getBearing()));
+                directionView.setImageDrawable(getRotatedDir(location.getBearing(), arrowBitmap));
+                if (startLocation != null) {
+                    directionStartView.setImageDrawable(getRotatedDir(location.bearingTo(startLocation), arrowStartBitmap));
+                }
             }
             currentAlt = (int) Math.round(location.getAltitude() - gh.heightOffset(location.getLongitude(), location.getLatitude(), location.getAltitude()));
             int displayAlt;
@@ -718,6 +728,7 @@ public class MainWearActivity extends WearableActivity implements
         }
         if (!location.hasBearing()) {
             directionView.setImageResource(android.R.color.transparent);
+            directionStartView.setImageResource(android.R.color.transparent);
         }
         alternatives.setText(clockFormat.format(new Date()).replaceAll(":", "\n"));
 
@@ -734,6 +745,9 @@ public class MainWearActivity extends WearableActivity implements
             if (prefs.getBoolean(Statics.PREFLOGGERAUTO, false)) {
                 startLogger();
                 for (Location loc : pointStack) logIGCline(loc);
+            }
+            if (startLocation == null) {
+                startLocation = location;
             }
         }
     }
@@ -771,7 +785,7 @@ public class MainWearActivity extends WearableActivity implements
         if (!activityStopping) mGoogleApiClient.connect();
     }
 
-    public BitmapDrawable getRotatedDir(float angle) {
+    public BitmapDrawable getRotatedDir(float angle, Bitmap arrowBitmap) {
         Bitmap canvasBitmap = arrowBitmap.copy(Bitmap.Config.ARGB_8888, true);
         canvasBitmap.eraseColor(0x00000000);
         Canvas canvas = new Canvas(canvasBitmap);
@@ -843,7 +857,9 @@ public class MainWearActivity extends WearableActivity implements
             pw.println("I013638FXA");
             loggerRunning = true;
             if (pointStack.size() > 0) {
-                startTimeOfFlight = pointStack.getFirst().getTime();
+                Location firstLocation = pointStack.getFirst();
+                startTimeOfFlight = firstLocation.getTime();
+                startLocation = firstLocation;
             } else {
                 startTimeOfFlight = new Date().getTime();
             }
@@ -878,6 +894,8 @@ public class MainWearActivity extends WearableActivity implements
             }
         }
         loggerRunning = false;
+        startLocation = null;
+        directionStartView.setImageResource(android.R.color.transparent);
         loggerState.setText("");
     }
 
