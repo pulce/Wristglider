@@ -31,6 +31,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.os.SystemClock;
 import android.os.Vibrator;
 import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
@@ -102,7 +103,7 @@ public class MainWearActivity extends WearableActivity implements
 
     private static SharedPreferences prefs;
 
-    private static boolean debugMode = true;
+    private static boolean debugMode = false;
     private static boolean mockup = false;
 
     private TextView speedTextView;
@@ -202,6 +203,10 @@ public class MainWearActivity extends WearableActivity implements
         public float varioBatt = Statics.MY_NULL_VALUE;
     }
     private VarioData mVarioData = new VarioData();
+    private KalmanFilter pressureFilter;
+    private KalmanFilter altitudeFilter;
+    private double lastMeasurementTime;
+    private float lastBaroAltitude = 0.f;
 
     private View stdView, stdViewVario;
 
@@ -725,11 +730,32 @@ public class MainWearActivity extends WearableActivity implements
 
     @Override
     public final void onSensorChanged(SensorEvent event) {
-        float millibarsOfPressure = event.values[0];
-        if (debugMode) Log.d(TAG, String.format("Pressure changed: %.2f", millibarsOfPressure));
+        final float pressure_hPa = event.values[0];
+        if (debugMode) Log.d(TAG, String.format("Pressure changed: %.2f", pressure_hPa));
 
-        mVarioData.pressure = millibarsOfPressure;
-        mVarioData.baroAlt = Math.round(SensorManager.getAltitude(SensorManager.PRESSURE_STANDARD_ATMOSPHERE, millibarsOfPressure));
+        final double currMeasurementTime = SystemClock.elapsedRealtime() / 1000.0f;
+        final double dt = currMeasurementTime - lastMeasurementTime;
+        lastMeasurementTime = currMeasurementTime;
+
+        if (mVarioData.pressure != Statics.MY_NULL_VALUE) {
+            pressureFilter.update(pressure_hPa, Statics.KF_VAR_MEASUREMENT, dt);
+            float baroAltitude = (float) SensorManager.getAltitude(SensorManager.PRESSURE_STANDARD_ATMOSPHERE, (float) pressureFilter.getXAbs());
+            baroAltitude = (Statics.MY_LPF_ALPHA * baroAltitude) + (1 - Statics.MY_LPF_ALPHA) * lastBaroAltitude;
+            lastBaroAltitude = baroAltitude;
+            altitudeFilter.update(baroAltitude, Statics.KF_VAR_MEASUREMENT, dt);
+
+            mVarioData.pressure = (float) pressureFilter.getXAbs();
+            mVarioData.baroAlt = Math.round(baroAltitude);
+            mVarioData.vario = (float) altitudeFilter.getXVel();
+
+            if (debugMode) Log.d(TAG, String.format("Pressure filtered: %.2f, baroalt: %d, vario: %.2f", mVarioData.pressure, mVarioData.baroAlt, mVarioData.vario));
+        } else {
+            mVarioData.pressure = pressure_hPa;
+            mVarioData.baroAlt = Math.round(SensorManager.getAltitude(SensorManager.PRESSURE_STANDARD_ATMOSPHERE, mVarioData.pressure));
+            mVarioData.vario = 0.0f;
+
+            lastBaroAltitude = mVarioData.baroAlt;
+        }
 
         if (displaySecAlt) {
             int displayAlt;
@@ -737,11 +763,24 @@ public class MainWearActivity extends WearableActivity implements
             displayAlt = mVarioData.baroAlt - secAltTare;
             altTextView.setText(String.format("%.0f", displayAlt * heightmultiplier));
         }
+        updateVario();
     }
 
     private void registerPressureSensor() {
         if (pressure != null) {
+            pressureFilter = new KalmanFilter(Statics.KF_VAR_ACCEL);
+            if (mVarioData.pressure != Statics.MY_NULL_VALUE) {
+                pressureFilter.reset(mVarioData.pressure);
+            } else {
+                pressureFilter.reset(SensorManager.PRESSURE_STANDARD_ATMOSPHERE);
+            }
+            altitudeFilter = new KalmanFilter(Statics.KF_VAR_ACCEL);
+            altitudeFilter.reset(0);
+
+            lastMeasurementTime = SystemClock.elapsedRealtime() / 1000.0f;
+
             sensorManager.registerListener(this, pressure, SensorManager.SENSOR_DELAY_NORMAL);
+            switchView(stdViewVario);
         }
     }
 
