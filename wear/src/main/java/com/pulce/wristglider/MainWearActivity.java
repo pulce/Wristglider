@@ -735,49 +735,51 @@ public class MainWearActivity extends WearableActivity implements
         final double dt = currMeasurementTime - lastMeasurementTime;
         lastMeasurementTime = currMeasurementTime;
 
-        if (mVarioData.pressure != Statics.MY_NULL_VALUE) {
-            pressureFilter.update(pressure_hPa, Statics.KF_VAR_MEASUREMENT, dt);
-            float baroAltitude = (float) SensorManager.getAltitude(SensorManager.PRESSURE_STANDARD_ATMOSPHERE, (float) pressureFilter.getXAbs());
-            baroAltitude = (Statics.MY_LPF_ALPHA * baroAltitude) + (1 - Statics.MY_LPF_ALPHA) * lastBaroAltitude;
-            lastBaroAltitude = baroAltitude;
-            altitudeFilter.update(baroAltitude, Statics.KF_VAR_MEASUREMENT, dt);
+        if (dt > 0) {
+            if (mVarioData.pressure != Statics.MY_NULL_VALUE) {
+                pressureFilter.update(pressure_hPa, Statics.KF_PRESSURE_VAR_MEASUREMENT, dt);
+                float baroAltitude = SensorManager.getAltitude(SensorManager.PRESSURE_STANDARD_ATMOSPHERE, (float) pressureFilter.getXAbs());
+                baroAltitude = (Statics.MY_LPF_ALPHA * baroAltitude) + (1 - Statics.MY_LPF_ALPHA) * lastBaroAltitude;
+                lastBaroAltitude = baroAltitude;
+                altitudeFilter.update(baroAltitude, Statics.KF_ALT_VAR_MEASUREMENT, dt);
 
-            mVarioData.pressure = (float) pressureFilter.getXAbs();
-            mVarioData.baroAlt = Math.round(baroAltitude);
-            mVarioData.vario = (float) altitudeFilter.getXVel();
+                mVarioData.pressure = (float) pressureFilter.getXAbs();
+                mVarioData.baroAlt = Math.round(baroAltitude);
+                mVarioData.vario = (float) altitudeFilter.getXVel();
 
-            //if (debugMode) Log.d(TAG, String.format("Pressure filtered: %.2f, baroalt: %d, vario: %.2f", mVarioData.pressure, mVarioData.baroAlt, mVarioData.vario));
-        } else {
-            mVarioData.pressure = pressure_hPa;
-            mVarioData.baroAlt = Math.round(SensorManager.getAltitude(SensorManager.PRESSURE_STANDARD_ATMOSPHERE, mVarioData.pressure));
-            mVarioData.vario = 0.0f;
+                //if (debugMode) Log.d(TAG, String.format("Pressure filtered: %.2f, baroalt: %d, vario: %.2f", mVarioData.pressure, mVarioData.baroAlt, mVarioData.vario));
+            } else {
+                lastBaroAltitude = SensorManager.getAltitude(SensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressure_hPa);
 
-            lastBaroAltitude = mVarioData.baroAlt;
+                mVarioData.pressure = pressure_hPa;
+                mVarioData.baroAlt = Math.round(lastBaroAltitude);
+                mVarioData.vario = 0.0f;
+            }
+
+            if (displaySecAlt) {
+                int displayAlt;
+                // bario alt used only for secondary altitude, because we dont configure QNH for altitude AGL
+                displayAlt = mVarioData.baroAlt - secAltTare;
+                altTextView.setText(String.format("%.0f", displayAlt * heightmultiplier));
+            }
+            updateVario();
         }
-
-        if (displaySecAlt) {
-            int displayAlt;
-            // bario alt used only for secondary altitude, because we dont configure QNH for altitude AGL
-            displayAlt = mVarioData.baroAlt - secAltTare;
-            altTextView.setText(String.format("%.0f", displayAlt * heightmultiplier));
-        }
-        updateVario();
     }
 
     private void registerPressureSensor() {
         if (pressure != null) {
-            pressureFilter = new KalmanFilter(Statics.KF_VAR_ACCEL);
+            pressureFilter = new KalmanFilter(Statics.KF_PRESSURE_VAR_ACCEL);
             if (mVarioData.pressure != Statics.MY_NULL_VALUE) {
                 pressureFilter.reset(mVarioData.pressure);
             } else {
                 pressureFilter.reset(SensorManager.PRESSURE_STANDARD_ATMOSPHERE);
             }
-            altitudeFilter = new KalmanFilter(Statics.KF_VAR_ACCEL);
-            altitudeFilter.reset(0);
+            altitudeFilter = new KalmanFilter(Statics.KF_ALT_VAR_ACCEL);
+            altitudeFilter.reset(lastBaroAltitude);
 
             lastMeasurementTime = SystemClock.elapsedRealtime() / 1000.0f;
 
-            sensorManager.registerListener(this, pressure, SensorManager.SENSOR_DELAY_FASTEST);
+            sensorManager.registerListener(this, pressure, SensorManager.SENSOR_DELAY_UI);
             switchView(stdViewVario);
         }
     }

@@ -23,10 +23,12 @@ public class Statics {
 
     public static final int MY_NULL_VALUE = -999999;
 
-    public static final float MY_LPF_ALPHA = 0.5f;
+    public static final float MY_LPF_ALPHA = 0.25f;
 
-    public static final double KF_VAR_ACCEL = 0.0075;  // Variance of pressure acceleration noise input.
-    public static final double KF_VAR_MEASUREMENT = 0.05;  // Variance of pressure measurement noise.
+    public static final double KF_PRESSURE_VAR_ACCEL = 0.0075;  // Variance of pressure acceleration noise input.
+    public static final double KF_PRESSURE_VAR_MEASUREMENT = 0.05;  // Variance of pressure measurement noise.
+    public static final double KF_ALT_VAR_ACCEL = 0.025;  // Variance of altitude acceleration noise input.
+    public static final double KF_ALT_VAR_MEASUREMENT = 0.001;  // Variance of altitude measurement noise.
 
     private static final DecimalFormat latForm = new DecimalFormat("0000000");
     private static final DecimalFormat lonForm = new DecimalFormat("00000000");
