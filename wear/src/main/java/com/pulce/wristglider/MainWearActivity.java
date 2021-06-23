@@ -725,13 +725,11 @@ public class MainWearActivity extends WearableActivity implements
     @Override
     public final void onAccuracyChanged(Sensor sensor, int accuracy) {
         // Do something here if sensor accuracy changes.
-        if (debugMode) Log.d(TAG, String.format("Pressure accuracy changed: %d", accuracy));
     }
 
     @Override
     public final void onSensorChanged(SensorEvent event) {
         final float pressure_hPa = event.values[0];
-        if (debugMode) Log.d(TAG, String.format("Pressure changed: %.2f", pressure_hPa));
 
         final double currMeasurementTime = SystemClock.elapsedRealtime() / 1000.0f;
         final double dt = currMeasurementTime - lastMeasurementTime;
@@ -748,7 +746,7 @@ public class MainWearActivity extends WearableActivity implements
             mVarioData.baroAlt = Math.round(baroAltitude);
             mVarioData.vario = (float) altitudeFilter.getXVel();
 
-            if (debugMode) Log.d(TAG, String.format("Pressure filtered: %.2f, baroalt: %d, vario: %.2f", mVarioData.pressure, mVarioData.baroAlt, mVarioData.vario));
+            //if (debugMode) Log.d(TAG, String.format("Pressure filtered: %.2f, baroalt: %d, vario: %.2f", mVarioData.pressure, mVarioData.baroAlt, mVarioData.vario));
         } else {
             mVarioData.pressure = pressure_hPa;
             mVarioData.baroAlt = Math.round(SensorManager.getAltitude(SensorManager.PRESSURE_STANDARD_ATMOSPHERE, mVarioData.pressure));
@@ -779,7 +777,7 @@ public class MainWearActivity extends WearableActivity implements
 
             lastMeasurementTime = SystemClock.elapsedRealtime() / 1000.0f;
 
-            sensorManager.registerListener(this, pressure, SensorManager.SENSOR_DELAY_NORMAL);
+            sensorManager.registerListener(this, pressure, SensorManager.SENSOR_DELAY_FASTEST);
             switchView(stdViewVario);
         }
     }
@@ -792,7 +790,7 @@ public class MainWearActivity extends WearableActivity implements
 
     @Override
     public void onLocationChanged(Location location) {
-        if (debugMode) Log.d(TAG, "location changed");
+        //if (debugMode) Log.d(TAG, "location changed");
         killFirstDirtylocations++;
         if (location.hasSpeed()) {
             speedTextView.setText(String.format("%.1f", location.getSpeed() * speedmultiplier));
