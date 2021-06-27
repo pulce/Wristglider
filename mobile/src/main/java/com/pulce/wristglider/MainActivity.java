@@ -25,6 +25,7 @@ import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.TableLayout;
 import android.widget.TableRow;
@@ -102,6 +103,9 @@ public class MainActivity extends Activity implements
         addTableRow(getString(R.string.speed_unit), Statics.PREFSPEEDUNIT);
         addTableRow(getString(R.string.use_bt_vario), Statics.PREFUSEBTVARIO);
         addTableRow(getString(R.string.vario_unit), Statics.PREFVARIOUNIT);
+        addTableRow(getString(R.string.vario_beeper), Statics.PREFVARIOBEEPER);
+        addTableRow(getString(R.string.vario_beeper_up), Statics.PREFVARIOBEEPERUP);
+        addTableRow(getString(R.string.vario_beeper_down), Statics.PREFVARIOBEEPERDOWN);
 
         mGoogleApiClient = new GoogleApiClient.Builder(this)
                 .addConnectionCallbacks(this)
@@ -317,6 +321,9 @@ public class MainActivity extends Activity implements
         dataMap.getDataMap().putString(Statics.PREFROTATEDEGREES, prefs.getString(Statics.PREFROTATEDEGREES, "0"));
         dataMap.getDataMap().putBoolean(Statics.PREFUSEBTVARIO, prefs.getBoolean(Statics.PREFUSEBTVARIO, false));
         dataMap.getDataMap().putString(Statics.PREFVARIOUNIT, prefs.getString(Statics.PREFVARIOUNIT, "m/s"));
+        dataMap.getDataMap().putBoolean(Statics.PREFVARIOBEEPER, prefs.getBoolean(Statics.PREFVARIOBEEPER, false));
+        dataMap.getDataMap().putFloat(Statics.PREFVARIOBEEPERUP, prefs.getFloat(Statics.PREFVARIOBEEPERUP, 0));
+        dataMap.getDataMap().putFloat(Statics.PREFVARIOBEEPERDOWN, prefs.getFloat(Statics.PREFVARIOBEEPERDOWN, -2));
         PutDataRequest request = dataMap.asPutDataRequest();
         request.setUrgent();
         Wearable.DataApi.putDataItem(mGoogleApiClient, request);
@@ -486,6 +493,7 @@ public class MainActivity extends Activity implements
             case Statics.PREFLOGGERAUTO:
             case Statics.PREFSCREENON:
             case Statics.PREFUSEBTVARIO:
+            case Statics.PREFVARIOBEEPER:
                 final CheckBox cp2 = new CheckBox(this);
                 cp2.setChecked(prefs.getBoolean(preferencekey, false));
                 cp2.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
@@ -562,6 +570,34 @@ public class MainActivity extends Activity implements
                     }
                 });
                 tr.addView(spinner2);
+                break;
+            case Statics.PREFVARIOBEEPERUP:
+            case Statics.PREFVARIOBEEPERDOWN:
+                final LinearLayout sbl = new LinearLayout(this);
+                final TextView tv = new TextView(this);
+                final SeekBar sb = new SeekBar(this);
+                sb.setLayoutParams(new TableRow.LayoutParams(TableRow.LayoutParams.MATCH_PARENT, TableRow.LayoutParams.WRAP_CONTENT));
+                sb.setMax(200); // -100 to 100
+                sb.setProgress((int) (100 + prefs.getFloat(preferencekey, 0) * 10)); // float to int with shift (ex. 1,5 as 115) )
+                tv.setText(String.format("%.1f", (sb.getProgress() - 100) / 10.f)); // int to float with shift (ex. 115 as 1,5)
+                sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                    int pval = 0;
+                    @Override
+                    public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                        pval = progress;
+                        tv.setText(String.format("%.1f", (progress - 100) / 10.f)); // int to float with shift (ex. 115 as 1,5)
+                    }
+                    @Override
+                    public void onStartTrackingTouch(SeekBar seekBar) {}
+                    @Override
+                    public void onStopTrackingTouch(SeekBar seekBar) {
+                        prefs.edit().putFloat(preferencekey, (pval - 100) / 10.f).apply(); // int to float with shift (ex. 115 as 1,5)
+                        updatePreferences();
+                    }
+                });
+                sbl.addView(tv);
+                sbl.addView(sb);
+                tr.addView(sbl);
                 break;
             default:
                 tr.setClickable(true);

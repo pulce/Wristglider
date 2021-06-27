@@ -120,6 +120,8 @@ public class MainWearActivity extends WearableActivity implements
     private View[] varioBarPos = new View[10];
     private View[] varioBarNeg = new View[10];
 
+    private Beeper beeper;
+
     private Bitmap arrowBitmap;
     private Bitmap arrowStartBitmap;
     private Matrix rotateMatrix = new Matrix();
@@ -319,6 +321,8 @@ public class MainWearActivity extends WearableActivity implements
             if (debugMode) Log.d(TAG, "No barometer");
         }
 
+        beeper = new Beeper(prefs.getFloat(Statics.PREFVARIOBEEPERUP, 0), prefs.getFloat(Statics.PREFVARIOBEEPERDOWN, -2));
+
         if (mockup) {
             progressBar.setVisibility(View.INVISIBLE);
             speedTextView.setText("36.5");
@@ -394,6 +398,7 @@ public class MainWearActivity extends WearableActivity implements
         mGoogleApiClient.disconnect();
         mHandler.removeCallbacksAndMessages(null);
         disableBTConnection();
+        beeper.stop();
     }
 
     @Override
@@ -407,6 +412,7 @@ public class MainWearActivity extends WearableActivity implements
                     .removeLocationUpdates(mGoogleApiClient, this);
         }
         mGoogleApiClient.disconnect();
+        beeper.stop();
     }
 
     @Override
@@ -718,6 +724,16 @@ public class MainWearActivity extends WearableActivity implements
                 sendBTFailed(Statics.MY_BT_FAILED_NO_BT);
             }
         }
+        if (prefs.getBoolean(Statics.PREFVARIOBEEPER, false) != dataMapItem.getDataMap().getBoolean(Statics.PREFVARIOBEEPER)) {
+            if (!dataMapItem.getDataMap().getBoolean(Statics.PREFVARIOBEEPER, false)) {
+                beeper.stop();
+            }
+        }
+        prefs.edit().putBoolean(Statics.PREFVARIOBEEPER, dataMapItem.getDataMap().getBoolean(Statics.PREFVARIOBEEPER)).apply();
+        prefs.edit().putFloat(Statics.PREFVARIOBEEPERUP, dataMapItem.getDataMap().getFloat(Statics.PREFVARIOBEEPERUP)).apply();
+        prefs.edit().putFloat(Statics.PREFVARIOBEEPERDOWN, dataMapItem.getDataMap().getFloat(Statics.PREFVARIOBEEPERDOWN)).apply();
+
+        beeper.setThresholds(prefs.getFloat(Statics.PREFVARIOBEEPERUP, 0), prefs.getFloat(Statics.PREFVARIOBEEPERDOWN, -2));
         setMultipliers();
         if (debugMode) Log.d(TAG, "Preferences updated");
     }
@@ -1195,6 +1211,9 @@ public class MainWearActivity extends WearableActivity implements
                 for (View varBar : varioBarNeg) {
                     varBar.setVisibility(View.INVISIBLE);
                 }
+            }
+            if (prefs.getBoolean(Statics.PREFVARIOBEEPER, false)) {
+                beeper.beep(mVarioData.vario);
             }
         }
         else {

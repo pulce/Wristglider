@@ -25,4 +25,7 @@
     <string name="bt_failed_user">Połączenie Bluetooth anulowane przez użytkownika</string>
     <string name="vario_unit">Wariometr</string>
     <string name="new_glider_fail_no_type">Typ paralotni nie może być pusty.</string>
+    <string name="vario_beeper">Dźwięk vario</string>
+    <string name="vario_beeper_up">Wznoszenie od</string>
+    <string name="vario_beeper_down">Opadanie od</string>
 </resources>

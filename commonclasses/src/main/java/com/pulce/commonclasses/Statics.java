@@ -30,6 +30,13 @@ public class Statics {
     public static final double KF_ALT_VAR_ACCEL = 0.025;  // Variance of altitude acceleration noise input.
     public static final double KF_ALT_VAR_MEASUREMENT = 0.001;  // Variance of altitude measurement noise.
 
+    public static final int MY_BEEP_DURATION = 200;
+    public static final int MY_BEEP_DURATION_COEF = 70;
+    public static final int MY_UP_MAX_VARIO_THRESHOLD = 10;
+    public static final int MY_INITIAL_FREQ_UP = 1200;
+    public static final int MY_FREQ_COEF = 100;
+    public static final int MY_FREQ_DOWN = 800;
+
     private static final DecimalFormat latForm = new DecimalFormat("0000000");
     private static final DecimalFormat lonForm = new DecimalFormat("00000000");
 
@@ -53,7 +60,9 @@ public class Statics {
     public static final String PREFVARIOUNIT = "/com/pulce/wristglider/prefvariounit";
     public static final String PREFUSEBTVARIO = "/com/pulce/wristglider/prefusebtvario";
     public static final String PREFBTVARIODEVICE = "/com/pulce/wristglider/prefbtvariodevice";
-
+    public static final String PREFVARIOBEEPER = "/com/pulce/wristglider/prefvariobeeper";
+    public static final String PREFVARIOBEEPERDOWN = "/com/pulce/wristglider/prefvariobeeperdown";
+    public static final String PREFVARIOBEEPERUP = "/com/pulce/wristglider/prefvariobeeperup";
 
     public static String getUTCdateReverse() {
         final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");

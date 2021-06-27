@@ -25,4 +25,7 @@
     <string name="bt_failed_user">Bluetooth Verbindung von Benutzer getrennt</string>
     <string name="vario_unit">Einheit Vario</string>
     <string name="new_glider_fail_no_type">Fluggerät Typ muss angegeben werden</string>
+    <string name="vario_beeper">Vario piepser</string>
+    <string name="vario_beeper_down">Senkenschwelle</string>
+    <string name="vario_beeper_up">Hubschwelle</string>
 </resources>
