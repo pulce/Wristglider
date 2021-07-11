@@ -17,6 +17,7 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.text.InputType;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -577,21 +578,21 @@ public class MainActivity extends Activity implements
                 final TextView tv = new TextView(this);
                 final SeekBar sb = new SeekBar(this);
                 sb.setLayoutParams(new TableRow.LayoutParams(TableRow.LayoutParams.MATCH_PARENT, TableRow.LayoutParams.WRAP_CONTENT));
-                sb.setMax(200); // -100 to 100
-                sb.setProgress((int) (100 + prefs.getFloat(preferencekey, 0) * 10)); // float to int with shift (ex. 1,5 as 115) )
-                tv.setText(String.format("%.1f", (sb.getProgress() - 100) / 10.f)); // int to float with shift (ex. 115 as 1,5)
+                sb.setMax(100); // -50 to 50
+                sb.setProgress((int) (50 + prefs.getFloat(preferencekey, 0) * 10)); // float to int with shift (ex. 1,5 as 65) )
+                tv.setText(String.format("%.1f", (sb.getProgress() - 50) / 10.f)); // int to float with shift (ex. 65 as 1,5)
                 sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
                     int pval = 0;
                     @Override
                     public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                         pval = progress;
-                        tv.setText(String.format("%.1f", (progress - 100) / 10.f)); // int to float with shift (ex. 115 as 1,5)
+                        tv.setText(String.format("%.1f", (progress - 50) / 10.f)); // int to float with shift (ex. 65 as 1,5)
                     }
                     @Override
                     public void onStartTrackingTouch(SeekBar seekBar) {}
                     @Override
                     public void onStopTrackingTouch(SeekBar seekBar) {
-                        prefs.edit().putFloat(preferencekey, (pval - 100) / 10.f).apply(); // int to float with shift (ex. 115 as 1,5)
+                        prefs.edit().putFloat(preferencekey, (pval - 50) / 10.f).apply(); // int to float with shift (ex. 65 as 1,5)
                         updatePreferences();
                     }
                 });
@@ -653,7 +654,8 @@ public class MainActivity extends Activity implements
                 });
                 break;
         }
-        tablelayout.addView(tr, new TableLayout.LayoutParams(TableLayout.LayoutParams.MATCH_PARENT, TableLayout.LayoutParams.WRAP_CONTENT));
+        tr.setGravity(Gravity.CENTER_VERTICAL);
+        tablelayout.addView(tr);
     }
 
     @Override

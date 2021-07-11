@@ -27,8 +27,8 @@ public class Statics {
 
     public static final double KF_PRESSURE_VAR_ACCEL = 0.0075;  // Variance of pressure acceleration noise input.
     public static final double KF_PRESSURE_VAR_MEASUREMENT = 0.05;  // Variance of pressure measurement noise.
-    public static final double KF_ALT_VAR_ACCEL = 0.025;  // Variance of altitude acceleration noise input.
-    public static final double KF_ALT_VAR_MEASUREMENT = 0.001;  // Variance of altitude measurement noise.
+    public static final double KF_ALT_VAR_ACCEL = 0.01;  // Variance of altitude acceleration noise input.
+    public static final double KF_ALT_VAR_MEASUREMENT = 0.005;  // Variance of altitude measurement noise.
 
     public static final int MY_BEEP_DURATION = 200;
     public static final int MY_BEEP_DURATION_COEF = 70;
