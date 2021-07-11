@@ -2,7 +2,6 @@ apply plugin: 'com.android.application'
 
 android {
     compileSdkVersion project.myCompileSdkVersion.toInteger()
-    publishNonDefault true
 
     defaultConfig {
         applicationId project.ext.myApplicationID
@@ -48,5 +47,6 @@ dependencies {
     compileOnly 'com.google.android.wearable:wearable:2.4.0'
     implementation 'com.google.firebase:firebase-appindexing:11.6.2'
     implementation 'com.google.android.gms:play-services-location:11.6.2'
+    implementation 'com.github.karlotoy:perfectTune:1.0.2'
     implementation project(':commonclasses')
 }

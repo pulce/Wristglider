@@ -17,6 +17,7 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.text.InputType;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -25,6 +26,7 @@ import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.TableLayout;
 import android.widget.TableRow;
@@ -101,7 +103,10 @@ public class MainActivity extends Activity implements
         addTableRow(getString(R.string.height_unit), Statics.PREFHEIGTHUNIT);
         addTableRow(getString(R.string.speed_unit), Statics.PREFSPEEDUNIT);
         addTableRow(getString(R.string.use_bt_vario), Statics.PREFUSEBTVARIO);
-        addTableRow(getString(R.string.vario_unit), Statics.PREFBTVARIOUNIT);
+        addTableRow(getString(R.string.vario_unit), Statics.PREFVARIOUNIT);
+        addTableRow(getString(R.string.vario_beeper), Statics.PREFVARIOBEEPER);
+        addTableRow(getString(R.string.vario_beeper_up), Statics.PREFVARIOBEEPERUP);
+        addTableRow(getString(R.string.vario_beeper_down), Statics.PREFVARIOBEEPERDOWN);
 
         mGoogleApiClient = new GoogleApiClient.Builder(this)
                 .addConnectionCallbacks(this)
@@ -316,7 +321,10 @@ public class MainActivity extends Activity implements
         dataMap.getDataMap().putString(Statics.PREFHEIGTHUNIT, prefs.getString(Statics.PREFHEIGTHUNIT, "m"));
         dataMap.getDataMap().putString(Statics.PREFROTATEDEGREES, prefs.getString(Statics.PREFROTATEDEGREES, "0"));
         dataMap.getDataMap().putBoolean(Statics.PREFUSEBTVARIO, prefs.getBoolean(Statics.PREFUSEBTVARIO, false));
-        dataMap.getDataMap().putString(Statics.PREFBTVARIOUNIT, prefs.getString(Statics.PREFBTVARIOUNIT, "m/s"));
+        dataMap.getDataMap().putString(Statics.PREFVARIOUNIT, prefs.getString(Statics.PREFVARIOUNIT, "m/s"));
+        dataMap.getDataMap().putBoolean(Statics.PREFVARIOBEEPER, prefs.getBoolean(Statics.PREFVARIOBEEPER, false));
+        dataMap.getDataMap().putFloat(Statics.PREFVARIOBEEPERUP, prefs.getFloat(Statics.PREFVARIOBEEPERUP, 0));
+        dataMap.getDataMap().putFloat(Statics.PREFVARIOBEEPERDOWN, prefs.getFloat(Statics.PREFVARIOBEEPERDOWN, -2));
         PutDataRequest request = dataMap.asPutDataRequest();
         request.setUrgent();
         Wearable.DataApi.putDataItem(mGoogleApiClient, request);
@@ -486,6 +494,7 @@ public class MainActivity extends Activity implements
             case Statics.PREFLOGGERAUTO:
             case Statics.PREFSCREENON:
             case Statics.PREFUSEBTVARIO:
+            case Statics.PREFVARIOBEEPER:
                 final CheckBox cp2 = new CheckBox(this);
                 cp2.setChecked(prefs.getBoolean(preferencekey, false));
                 cp2.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
@@ -500,7 +509,7 @@ public class MainActivity extends Activity implements
                 break;
             case Statics.PREFHEIGTHUNIT:
             case Statics.PREFSPEEDUNIT:
-            case Statics.PREFBTVARIOUNIT:
+            case Statics.PREFVARIOUNIT:
             case Statics.PREFLOGGERSECONDS:
             case Statics.PREFROTATEDEGREES:
                 final Spinner spinner2 = new Spinner(this);
@@ -521,7 +530,7 @@ public class MainActivity extends Activity implements
                         spinner2Array.add("mph");
                         spinner2Array.add("kn");
                         break;
-                    case Statics.PREFBTVARIOUNIT:
+                    case Statics.PREFVARIOUNIT:
                         spinner2Array.add("m/s");
                         spinner2Array.add("kn");
                         break;
@@ -562,6 +571,34 @@ public class MainActivity extends Activity implements
                     }
                 });
                 tr.addView(spinner2);
+                break;
+            case Statics.PREFVARIOBEEPERUP:
+            case Statics.PREFVARIOBEEPERDOWN:
+                final LinearLayout sbl = new LinearLayout(this);
+                final TextView tv = new TextView(this);
+                final SeekBar sb = new SeekBar(this);
+                sb.setLayoutParams(new TableRow.LayoutParams(TableRow.LayoutParams.MATCH_PARENT, TableRow.LayoutParams.WRAP_CONTENT));
+                sb.setMax(100); // -50 to 50
+                sb.setProgress((int) (50 + prefs.getFloat(preferencekey, 0) * 10)); // float to int with shift (ex. 1,5 as 65) )
+                tv.setText(String.format("%.1f", (sb.getProgress() - 50) / 10.f)); // int to float with shift (ex. 65 as 1,5)
+                sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                    int pval = 0;
+                    @Override
+                    public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                        pval = progress;
+                        tv.setText(String.format("%.1f", (progress - 50) / 10.f)); // int to float with shift (ex. 65 as 1,5)
+                    }
+                    @Override
+                    public void onStartTrackingTouch(SeekBar seekBar) {}
+                    @Override
+                    public void onStopTrackingTouch(SeekBar seekBar) {
+                        prefs.edit().putFloat(preferencekey, (pval - 50) / 10.f).apply(); // int to float with shift (ex. 65 as 1,5)
+                        updatePreferences();
+                    }
+                });
+                sbl.addView(tv);
+                sbl.addView(sb);
+                tr.addView(sbl);
                 break;
             default:
                 tr.setClickable(true);
@@ -617,7 +654,8 @@ public class MainActivity extends Activity implements
                 });
                 break;
         }
-        tablelayout.addView(tr, new TableLayout.LayoutParams(TableLayout.LayoutParams.MATCH_PARENT, TableLayout.LayoutParams.WRAP_CONTENT));
+        tr.setGravity(Gravity.CENTER_VERTICAL);
+        tablelayout.addView(tr);
     }
 
     @Override
